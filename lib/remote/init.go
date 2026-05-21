@@ -11,6 +11,7 @@ func InitScanners(remote *Library) {
 	remote.AddScanner(NewLocalScanner())
 	remote.AddScanner(NewNumverifyScanner(numverifySupplier))
 	remote.AddScanner(NewGoogleSearchScanner())
+	remote.AddScanner(NewSearXNGScanner(nil))
 	remote.AddScanner(NewOVHScanner(ovhSupplier))
 	remote.AddScanner(NewGoogleCSEScanner(nil))
 
