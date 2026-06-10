@@ -412,6 +412,61 @@
           </b-card>
         </div>
 
+        <div v-else-if="isNumverify && hasData" class="numverify-summary">
+          <div class="numverify-status">
+            <b-badge
+              :variant="numverify.valid ? 'success' : 'danger'"
+              class="numverify-status-badge"
+            >
+              <b-icon-check-circle-fill
+                v-if="numverify.valid"
+                aria-hidden="true"
+                class="mr-1"
+              />
+              <b-icon-exclamation-circle-fill
+                v-else
+                aria-hidden="true"
+                class="mr-1"
+              />
+              {{ numverify.valid ? "Valid number" : "Invalid number" }}
+            </b-badge>
+            <span v-if="numverifyHeadline" class="numverify-headline">
+              {{ numverifyHeadline }}
+            </span>
+            <span v-if="numverifyLineType" class="numverify-line-type text-muted">
+              {{ numverifyLineType }} line
+            </span>
+          </div>
+
+          <b-row class="numverify-groups">
+            <b-col
+              v-for="group in numverifyGroups"
+              :key="group.key"
+              cols="12"
+              md="4"
+              class="mb-3"
+            >
+              <b-card no-body class="numverify-group h-100">
+                <b-card-header class="numverify-group-header">
+                  {{ group.label }}
+                </b-card-header>
+                <b-list-group flush>
+                  <b-list-group-item
+                    v-for="row in group.rows"
+                    :key="row.label"
+                    class="numverify-row"
+                  >
+                    <span class="numverify-row-label text-muted">
+                      {{ row.label }}
+                    </span>
+                    <span class="numverify-row-value">{{ row.value }}</span>
+                  </b-list-group-item>
+                </b-list-group>
+              </b-card>
+            </b-col>
+          </b-row>
+        </div>
+
         <JsonViewer v-else-if="hasData" :value="data"></JsonViewer>
 
         <p v-else-if="!loading" class="text-muted mb-0">
@@ -485,6 +540,30 @@ interface LaunchableSearch {
   url: string;
 }
 
+interface NumverifyResult {
+  valid: boolean;
+  number?: string;
+  local_format?: string;
+  international_format?: string;
+  country_prefix?: string;
+  country_code?: string;
+  country_name?: string;
+  location?: string;
+  carrier?: string;
+  line_type?: string;
+}
+
+interface NumverifyRow {
+  label: string;
+  value: string;
+}
+
+interface NumverifyGroup {
+  key: string;
+  label: string;
+  rows: NumverifyRow[];
+}
+
 @Component({
   components: {
     JsonViewer,
@@ -555,6 +634,68 @@ export default class Scanner extends Vue {
 
   get isSearXNGSearch(): boolean {
     return this.scanId === "searxng";
+  }
+
+  get isNumverify(): boolean {
+    return this.scanId === "numverify";
+  }
+
+  get numverify(): NumverifyResult {
+    return (this.data || {}) as NumverifyResult;
+  }
+
+  get numverifyHeadline(): string {
+    return (
+      this.numverify.international_format || this.numverify.number || ""
+    );
+  }
+
+  get numverifyLineType(): string {
+    const lineType = this.numverify.line_type;
+    if (!lineType) {
+      return "";
+    }
+    return lineType.charAt(0).toUpperCase() + lineType.slice(1);
+  }
+
+  get numverifyGroups(): NumverifyGroup[] {
+    const result = this.numverify;
+    const definitions: { key: string; label: string; rows: NumverifyRow[] }[] = [
+      {
+        key: "formats",
+        label: "Number formats",
+        rows: [
+          { label: "International", value: result.international_format || "" },
+          { label: "Local", value: result.local_format || "" },
+          { label: "Raw", value: result.number || "" },
+        ],
+      },
+      {
+        key: "location",
+        label: "Country & location",
+        rows: [
+          { label: "Country", value: result.country_name || "" },
+          { label: "Country code", value: result.country_code || "" },
+          { label: "Dial prefix", value: result.country_prefix || "" },
+          { label: "Location", value: result.location || "" },
+        ],
+      },
+      {
+        key: "carrier",
+        label: "Carrier & line",
+        rows: [
+          { label: "Carrier", value: result.carrier || "" },
+          { label: "Line type", value: this.numverifyLineType },
+        ],
+      },
+    ];
+
+    return definitions
+      .map((group) => ({
+        ...group,
+        rows: group.rows.filter((row) => row.value !== ""),
+      }))
+      .filter((group) => group.rows.length > 0);
   }
 
   get searchGroupDefinitions(): Omit<GoogleSearchGroup, "items">[] {
@@ -955,5 +1096,61 @@ export default class Scanner extends Vue {
   border-top: 1px solid #e9ecef;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
+}
+
+.numverify-status {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.numverify-status-badge {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.75rem;
+}
+
+.numverify-headline {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.numverify-line-type {
+  font-size: 0.95rem;
+}
+
+.numverify-group {
+  border: 1px solid #e9ecef;
+}
+
+.numverify-group-header {
+  background-color: #f8f9fa;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.numverify-row {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+}
+
+.numverify-row-label {
+  font-size: 0.85rem;
+  margin-right: 1rem;
+  white-space: nowrap;
+}
+
+.numverify-row-value {
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
 }
 </style>
