@@ -467,6 +467,54 @@
           </b-row>
         </div>
 
+        <div v-else-if="isOvh && hasData" class="numverify-summary">
+          <div class="numverify-status">
+            <b-badge
+              :variant="ovh.found ? 'success' : 'secondary'"
+              class="numverify-status-badge"
+            >
+              <b-icon-check-circle-fill
+                v-if="ovh.found"
+                aria-hidden="true"
+                class="mr-1"
+              />
+              <b-icon-dash-circle-fill v-else aria-hidden="true" class="mr-1" />
+              {{ ovh.found ? "Found" : "Not found" }}
+            </b-badge>
+          </div>
+
+          <b-row v-if="ovhGroups.length > 0" class="numverify-groups">
+            <b-col
+              v-for="group in ovhGroups"
+              :key="group.key"
+              cols="12"
+              md="6"
+              class="mb-3"
+            >
+              <b-card no-body class="numverify-group h-100">
+                <b-card-header class="numverify-group-header">
+                  {{ group.label }}
+                </b-card-header>
+                <b-list-group flush>
+                  <b-list-group-item
+                    v-for="row in group.rows"
+                    :key="row.label"
+                    class="numverify-row"
+                  >
+                    <span class="numverify-row-label text-muted">
+                      {{ row.label }}
+                    </span>
+                    <span class="numverify-row-value">{{ row.value }}</span>
+                  </b-list-group-item>
+                </b-list-group>
+              </b-card>
+            </b-col>
+          </b-row>
+          <p v-else class="text-muted mb-0">
+            No additional location details were returned.
+          </p>
+        </div>
+
         <JsonViewer v-else-if="hasData" :value="data"></JsonViewer>
 
         <p v-else-if="!loading" class="text-muted mb-0">
@@ -562,6 +610,13 @@ interface NumverifyGroup {
   key: string;
   label: string;
   rows: NumverifyRow[];
+}
+
+interface OVHResult {
+  found: boolean;
+  number_range?: string;
+  city?: string;
+  zip_code?: string;
 }
 
 @Component({
@@ -696,6 +751,29 @@ export default class Scanner extends Vue {
         rows: group.rows.filter((row) => row.value !== ""),
       }))
       .filter((group) => group.rows.length > 0);
+  }
+
+  get isOvh(): boolean {
+    return this.scanId === "ovh";
+  }
+
+  get ovh(): OVHResult {
+    return (this.data || {}) as OVHResult;
+  }
+
+  get ovhGroups(): NumverifyGroup[] {
+    const result = this.ovh;
+    const rows: NumverifyRow[] = [
+      { label: "Number range", value: result.number_range || "" },
+      { label: "City", value: result.city || "" },
+      { label: "Zip code", value: result.zip_code || "" },
+    ].filter((row) => row.value !== "");
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    return [{ key: "location", label: "Location", rows }];
   }
 
   get searchGroupDefinitions(): Omit<GoogleSearchGroup, "items">[] {
