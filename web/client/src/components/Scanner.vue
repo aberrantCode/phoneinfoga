@@ -515,6 +515,90 @@
           </p>
         </div>
 
+        <div v-else-if="isGoogleCSE && hasData" class="googlecse-summary">
+          <div class="googlecse-counts">
+            <div
+              v-for="count in googlecseCounts"
+              :key="count.label"
+              class="googlecse-count"
+            >
+              <span class="googlecse-count-value">{{ count.value }}</span>
+              <span class="googlecse-count-label text-muted">
+                {{ count.label }}
+              </span>
+            </div>
+            <b-button
+              v-if="googlecse.homepage"
+              :href="googlecse.homepage"
+              target="_blank"
+              rel="noopener"
+              variant="outline-primary"
+              size="sm"
+              class="googlecse-homepage"
+            >
+              <b-icon-box-arrow-up-right aria-hidden="true" class="mr-1" />
+              Open search engine
+            </b-button>
+          </div>
+
+          <div
+            v-if="googlecseItems.length > 0"
+            class="searxng-results googlecse-results"
+          >
+            <div
+              v-for="(item, itemIndex) in googlecseItems"
+              :key="`googlecse-${itemIndex}`"
+              class="searxng-result googlecse-result"
+            >
+              <div class="googlecse-result-main">
+                <a :href="item.url" target="_blank" rel="noopener">
+                  {{ item.title || item.url }}
+                </a>
+                <p v-if="item.url" class="text-muted small mb-0">
+                  {{ item.url }}
+                </p>
+              </div>
+              <div class="googlecse-result-actions">
+                <b-button
+                  :id="actionButtonId('googlecse-open', 'items', itemIndex)"
+                  :href="item.url"
+                  target="_blank"
+                  rel="noopener"
+                  variant="dark"
+                  size="sm"
+                  class="google-action-button mr-1 mb-1"
+                  aria-label="Open result in new tab"
+                >
+                  <b-icon-box-arrow-up-right aria-hidden="true" />
+                </b-button>
+                <b-tooltip
+                  :target="actionButtonId('googlecse-open', 'items', itemIndex)"
+                >
+                  Open result in new tab
+                </b-tooltip>
+                <b-button
+                  :id="actionButtonId('googlecse-copy', 'items', itemIndex)"
+                  variant="outline-secondary"
+                  size="sm"
+                  class="google-action-button mb-1"
+                  aria-label="Copy result URL"
+                  @click="copyText(item.url || '')"
+                >
+                  <b-icon-link45deg aria-hidden="true" />
+                </b-button>
+                <b-tooltip
+                  :target="actionButtonId('googlecse-copy', 'items', itemIndex)"
+                >
+                  Copy result URL
+                </b-tooltip>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-muted mb-0">
+            No results were returned for this number.
+          </p>
+        </div>
+
         <JsonViewer v-else-if="hasData" :value="data"></JsonViewer>
 
         <p v-else-if="!loading" class="text-muted mb-0">
@@ -617,6 +701,24 @@ interface OVHResult {
   number_range?: string;
   city?: string;
   zip_code?: string;
+}
+
+interface GoogleCSEResultItem {
+  title?: string;
+  url?: string;
+}
+
+interface GoogleCSEResult {
+  homepage?: string;
+  result_count?: number;
+  total_result_count?: number;
+  total_request_count?: number;
+  items?: GoogleCSEResultItem[];
+}
+
+interface GoogleCSECount {
+  label: string;
+  value: number;
 }
 
 @Component({
@@ -774,6 +876,30 @@ export default class Scanner extends Vue {
     }
 
     return [{ key: "location", label: "Location", rows }];
+  }
+
+  get isGoogleCSE(): boolean {
+    return this.scanId === "googlecse";
+  }
+
+  get googlecse(): GoogleCSEResult {
+    return (this.data || {}) as GoogleCSEResult;
+  }
+
+  get googlecseItems(): GoogleCSEResultItem[] {
+    return this.googlecse.items || [];
+  }
+
+  get googlecseCounts(): GoogleCSECount[] {
+    const result = this.googlecse;
+    return [
+      { label: "Results shown", value: result.result_count || 0 },
+      {
+        label: "Total number of results",
+        value: result.total_result_count || 0,
+      },
+      { label: "Requests made", value: result.total_request_count || 0 },
+    ];
   }
 
   get searchGroupDefinitions(): Omit<GoogleSearchGroup, "items">[] {
@@ -1174,6 +1300,52 @@ export default class Scanner extends Vue {
   border-top: 1px solid #e9ecef;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
+}
+
+.googlecse-counts {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.googlecse-count {
+  display: flex;
+  flex-direction: column;
+}
+
+.googlecse-count-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.googlecse-count-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.googlecse-homepage {
+  margin-left: auto;
+}
+
+.googlecse-result {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.googlecse-result-main {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.googlecse-result-actions {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .numverify-status {
