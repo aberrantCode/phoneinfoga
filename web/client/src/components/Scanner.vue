@@ -36,24 +36,24 @@
             Unavailable
           </b-badge>
           <b-button
-            v-if="isGoogleSearch && hasData && !launcherRunning"
-            @click.stop="startLauncher(allGoogleDorks)"
+            v-if="isGoogleSearch && hasData && !searchLauncherRunning"
+            @click.stop="openAllSearches"
             variant="outline-primary"
             size="sm"
             class="mr-2"
             >Open All</b-button
           >
           <b-button
-            v-if="isSearXNGSearch && hasData && !launcherRunning"
-            @click.stop="startLauncher(matchedSearXNGQueries)"
+            v-if="isSearXNGSearch && hasData && !searchLauncherRunning"
+            @click.stop="openMatchedSearches"
             variant="outline-primary"
             size="sm"
             class="mr-2"
             >Open Matches</b-button
           >
           <b-button
-            v-if="(isGoogleSearch || isSearXNGSearch) && launcherRunning"
-            @click.stop="stopLauncher"
+            v-if="(isGoogleSearch || isSearXNGSearch) && searchLauncherRunning"
+            @click.stop="stopSearches"
             variant="outline-danger"
             size="sm"
             class="mr-2"
@@ -91,326 +91,14 @@
           {{ error }}
         </b-alert>
 
-        <div v-else-if="isGoogleSearch && hasData">
-          <p class="text-muted mb-3">
-            Generated search actions grouped by investigation intent. Open a
-            single query, copy it for adjustment, or launch timed batches.
-          </p>
-
-          <b-card
-            v-for="group in googleGroups"
-            :key="group.key"
-            no-body
-            class="google-action-group"
-          >
-            <b-card-header
-              class="google-action-group-header"
-              @click="toggleGoogleCategory(group.key)"
-            >
-              <div
-                class="d-flex flex-wrap align-items-center justify-content-between"
-              >
-                <div class="google-action-group-title">
-                  <h4 class="h5 mb-1">
-                    <span class="scanner-panel-chevron" aria-hidden="true">
-                      {{ isGoogleCategoryExpanded(group.key) ? "-" : "+" }}
-                    </span>
-                    {{ group.label }}
-                    <b-badge variant="secondary" class="ml-2">
-                      {{ group.items.length }}
-                    </b-badge>
-                  </h4>
-                  <p class="text-muted mb-0">{{ group.description }}</p>
-                </div>
-                <div class="d-flex align-items-center mt-2 mt-sm-0">
-                  <b-badge
-                    v-if="launcherRunning"
-                    variant="info"
-                    class="mr-2"
-                  >
-                    {{ launcherRemaining }} queued
-                  </b-badge>
-                  <b-button
-                    v-if="!launcherRunning"
-                    variant="outline-primary"
-                    size="sm"
-                    @click.stop="startLauncher(group.items)"
-                  >
-                    Open All
-                  </b-button>
-                  <b-button
-                    v-else
-                    variant="outline-danger"
-                    size="sm"
-                    @click.stop="stopLauncher"
-                  >
-                    Stop
-                  </b-button>
-                </div>
-              </div>
-            </b-card-header>
-
-            <b-collapse
-              :id="categoryCollapseId(group.key)"
-              :visible="isGoogleCategoryExpanded(group.key)"
-            >
-              <b-card-body>
-                <b-table
-                  small
-                  responsive
-                  outlined
-                  :items="group.items"
-                  :fields="googleFields"
-                >
-                  <template #cell(dork)="row">
-                    <code class="google-query">{{ row.item.dork }}</code>
-                  </template>
-                  <template #cell(actions)="row">
-                    <b-button
-                      :id="actionButtonId('open', group.key, row.index)"
-                      :href="row.item.url"
-                      target="_blank"
-                      rel="noopener"
-                      variant="dark"
-                      size="sm"
-                      class="google-action-button mr-1 mb-1"
-                      aria-label="Open query in Google"
-                    >
-                      <b-icon-box-arrow-up-right aria-hidden="true" />
-                    </b-button>
-                    <b-tooltip
-                      :target="actionButtonId('open', group.key, row.index)"
-                    >
-                      Open query in Google
-                    </b-tooltip>
-                    <b-button
-                      :id="actionButtonId('copy-query', group.key, row.index)"
-                      variant="outline-secondary"
-                      size="sm"
-                      class="google-action-button mr-1 mb-1"
-                      aria-label="Copy query text"
-                      @click="copyText(row.item.dork)"
-                    >
-                      <b-icon-clipboard aria-hidden="true" />
-                    </b-button>
-                    <b-tooltip
-                      :target="
-                        actionButtonId('copy-query', group.key, row.index)
-                      "
-                    >
-                      Copy query text
-                    </b-tooltip>
-                    <b-button
-                      :id="actionButtonId('copy-url', group.key, row.index)"
-                      variant="outline-secondary"
-                      size="sm"
-                      class="google-action-button mb-1"
-                      aria-label="Copy Google search URL"
-                      @click="copyText(row.item.url)"
-                    >
-                      <b-icon-link45deg aria-hidden="true" />
-                    </b-button>
-                    <b-tooltip
-                      :target="
-                        actionButtonId('copy-url', group.key, row.index)
-                      "
-                    >
-                      Copy Google search URL
-                    </b-tooltip>
-                  </template>
-                </b-table>
-              </b-card-body>
-            </b-collapse>
-          </b-card>
-        </div>
-
-        <div v-else-if="isSearXNGSearch && hasData">
-          <p class="text-muted mb-3">
-            SearXNG checked each search action and returned match counts with
-            top results. Open matching searches, inspect hits inline, or copy a
-            query for adjustment.
-          </p>
-
-          <b-card
-            v-for="group in searxngGroups"
-            :key="group.key"
-            no-body
-            class="google-action-group"
-          >
-            <b-card-header
-              class="google-action-group-header"
-              @click="toggleSearchCategory(group.key)"
-            >
-              <div
-                class="d-flex flex-wrap align-items-center justify-content-between"
-              >
-                <div class="google-action-group-title">
-                  <h4 class="h5 mb-1">
-                    <span class="scanner-panel-chevron" aria-hidden="true">
-                      {{ isSearchCategoryExpanded(group.key) ? "-" : "+" }}
-                    </span>
-                    {{ group.label }}
-                    <b-badge variant="secondary" class="ml-2">
-                      {{ group.items.length }}
-                    </b-badge>
-                    <b-badge
-                      :variant="groupMatchCount(group.items) > 0 ? 'success' : 'light'"
-                      class="ml-1"
-                    >
-                      {{ groupMatchCount(group.items) }} matched
-                    </b-badge>
-                  </h4>
-                  <p class="text-muted mb-0">{{ group.description }}</p>
-                </div>
-                <div class="d-flex align-items-center mt-2 mt-sm-0">
-                  <b-badge
-                    v-if="launcherRunning"
-                    variant="info"
-                    class="mr-2"
-                  >
-                    {{ launcherRemaining }} queued
-                  </b-badge>
-                  <b-button
-                    v-if="!launcherRunning"
-                    variant="outline-primary"
-                    size="sm"
-                    :disabled="groupMatchCount(group.items) === 0"
-                    @click.stop="startLauncher(matchedRows(group.items))"
-                  >
-                    Open Matches
-                  </b-button>
-                  <b-button
-                    v-else
-                    variant="outline-danger"
-                    size="sm"
-                    @click.stop="stopLauncher"
-                  >
-                    Stop
-                  </b-button>
-                </div>
-              </div>
-            </b-card-header>
-
-            <b-collapse
-              :id="categoryCollapseId(group.key)"
-              :visible="isSearchCategoryExpanded(group.key)"
-            >
-              <b-card-body>
-                <b-table
-                  small
-                  responsive
-                  outlined
-                  :items="group.items"
-                  :fields="searxngFields"
-                >
-                  <template #cell(dork)="row">
-                    <code class="google-query">{{ row.item.dork }}</code>
-                    <p v-if="row.item.error" class="text-danger small mb-0 mt-2">
-                      {{ row.item.error }}
-                    </p>
-                  </template>
-                  <template #cell(result_count)="row">
-                    <b-badge
-                      :variant="row.item.error ? 'warning' : row.item.result_count > 0 ? 'success' : 'secondary'"
-                    >
-                      {{ row.item.error ? "Error" : row.item.result_count }}
-                    </b-badge>
-                  </template>
-                  <template #cell(results)="row">
-                    <div
-                      v-if="row.item.results && row.item.results.length > 0"
-                      class="searxng-results"
-                    >
-                      <div
-                        v-for="(result, resultIndex) in row.item.results"
-                        :key="`${row.item.url}-${resultIndex}`"
-                        class="searxng-result"
-                      >
-                        <a :href="result.url" target="_blank" rel="noopener">
-                          {{ result.title || result.url }}
-                        </a>
-                        <span v-if="result.engine" class="text-muted small">
-                          {{ result.engine }}
-                        </span>
-                        <p v-if="result.content" class="text-muted small mb-0">
-                          {{ result.content }}
-                        </p>
-                      </div>
-                    </div>
-                    <span v-else class="text-muted">No inline hits</span>
-                  </template>
-                  <template #cell(actions)="row">
-                    <b-button
-                      :id="actionButtonId('searxng-open', group.key, row.index)"
-                      :href="row.item.url"
-                      target="_blank"
-                      rel="noopener"
-                      variant="dark"
-                      size="sm"
-                      class="google-action-button mr-1 mb-1"
-                      aria-label="Open query in SearXNG"
-                    >
-                      <b-icon-box-arrow-up-right aria-hidden="true" />
-                    </b-button>
-                    <b-tooltip
-                      :target="
-                        actionButtonId('searxng-open', group.key, row.index)
-                      "
-                    >
-                      Open query in SearXNG
-                    </b-tooltip>
-                    <b-button
-                      :id="
-                        actionButtonId('searxng-copy-query', group.key, row.index)
-                      "
-                      variant="outline-secondary"
-                      size="sm"
-                      class="google-action-button mr-1 mb-1"
-                      aria-label="Copy query text"
-                      @click="copyText(row.item.dork)"
-                    >
-                      <b-icon-clipboard aria-hidden="true" />
-                    </b-button>
-                    <b-tooltip
-                      :target="
-                        actionButtonId(
-                          'searxng-copy-query',
-                          group.key,
-                          row.index
-                        )
-                      "
-                    >
-                      Copy query text
-                    </b-tooltip>
-                    <b-button
-                      :id="
-                        actionButtonId('searxng-copy-url', group.key, row.index)
-                      "
-                      variant="outline-secondary"
-                      size="sm"
-                      class="google-action-button mb-1"
-                      aria-label="Copy SearXNG search URL"
-                      @click="copyText(row.item.url)"
-                    >
-                      <b-icon-link45deg aria-hidden="true" />
-                    </b-button>
-                    <b-tooltip
-                      :target="
-                        actionButtonId(
-                          'searxng-copy-url',
-                          group.key,
-                          row.index
-                        )
-                      "
-                    >
-                      Copy SearXNG search URL
-                    </b-tooltip>
-                  </template>
-                </b-table>
-              </b-card-body>
-            </b-collapse>
-          </b-card>
-        </div>
+        <SearchActionGroups
+          v-else-if="(isGoogleSearch || isSearXNGSearch) && hasData"
+          ref="searchGroups"
+          :mode="isGoogleSearch ? 'google' : 'searxng'"
+          :data="data"
+          :id-prefix="collapseId"
+          @launcher-change="searchLauncherRunning = $event"
+        />
 
         <ScannerSummary
           v-else-if="isNumverify && hasData"
@@ -455,59 +143,13 @@
             </b-button>
           </div>
 
-          <div
+          <SearchResultList
             v-if="googlecseItems.length > 0"
-            class="searxng-results googlecse-results"
-          >
-            <div
-              v-for="(item, itemIndex) in googlecseItems"
-              :key="`googlecse-${itemIndex}`"
-              class="searxng-result googlecse-result"
-            >
-              <div class="googlecse-result-main">
-                <a :href="item.url" target="_blank" rel="noopener">
-                  {{ item.title || item.url }}
-                </a>
-                <p v-if="item.url" class="text-muted small mb-0">
-                  {{ item.url }}
-                </p>
-              </div>
-              <div class="googlecse-result-actions">
-                <b-button
-                  :id="actionButtonId('googlecse-open', 'items', itemIndex)"
-                  :href="item.url"
-                  target="_blank"
-                  rel="noopener"
-                  variant="dark"
-                  size="sm"
-                  class="google-action-button mr-1 mb-1"
-                  aria-label="Open result in new tab"
-                >
-                  <b-icon-box-arrow-up-right aria-hidden="true" />
-                </b-button>
-                <b-tooltip
-                  :target="actionButtonId('googlecse-open', 'items', itemIndex)"
-                >
-                  Open result in new tab
-                </b-tooltip>
-                <b-button
-                  :id="actionButtonId('googlecse-copy', 'items', itemIndex)"
-                  variant="outline-secondary"
-                  size="sm"
-                  class="google-action-button mb-1"
-                  aria-label="Copy result URL"
-                  @click="copyText(item.url || '')"
-                >
-                  <b-icon-link45deg aria-hidden="true" />
-                </b-button>
-                <b-tooltip
-                  :target="actionButtonId('googlecse-copy', 'items', itemIndex)"
-                >
-                  Copy result URL
-                </b-tooltip>
-              </div>
-            </div>
-          </div>
+            :results="googlecseResults"
+            id-prefix="googlecse"
+            :show-actions="true"
+            @copy="copyText"
+          />
           <p v-else class="text-muted mb-0">
             No results were returned for this number.
           </p>
@@ -549,63 +191,9 @@ import ScannerSummary, {
   SummaryBadge,
   SummaryGroup,
 } from "./ScannerSummary.vue";
+import SearchActionGroups from "./SearchActionGroups.vue";
+import SearchResultList, { SearchResult } from "./SearchResultList.vue";
 import config from "@/config";
-
-interface GoogleSearchDork {
-  number: string;
-  dork: string;
-  url: string;
-}
-
-interface GoogleSearchResponse {
-  social_media?: GoogleSearchDork[];
-  disposable_providers?: GoogleSearchDork[];
-  reputation?: GoogleSearchDork[];
-  individuals?: GoogleSearchDork[];
-  general?: GoogleSearchDork[];
-}
-
-interface GoogleSearchGroup {
-  key: keyof GoogleSearchResponse;
-  label: string;
-  description: string;
-  items: GoogleSearchDork[];
-}
-
-interface SearXNGResultItem {
-  title?: string;
-  url: string;
-  content?: string;
-  engine?: string;
-}
-
-interface SearXNGQueryResult {
-  number: string;
-  dork: string;
-  url: string;
-  result_count: number;
-  results?: SearXNGResultItem[];
-  error?: string;
-}
-
-interface SearXNGResponse {
-  social_media?: SearXNGQueryResult[];
-  disposable_providers?: SearXNGQueryResult[];
-  reputation?: SearXNGQueryResult[];
-  individuals?: SearXNGQueryResult[];
-  general?: SearXNGQueryResult[];
-}
-
-interface SearXNGGroup {
-  key: keyof SearXNGResponse;
-  label: string;
-  description: string;
-  items: SearXNGQueryResult[];
-}
-
-interface LaunchableSearch {
-  url: string;
-}
 
 interface NumverifyResult {
   valid: boolean;
@@ -689,6 +277,8 @@ interface LocalRow {
   components: {
     JsonViewer,
     ScannerSummary,
+    SearchActionGroups,
+    SearchResultList,
   },
 })
 export default class Scanner extends Vue {
@@ -697,25 +287,10 @@ export default class Scanner extends Vue {
   dryrunError = false;
   error: unknown = null;
   expanded = false;
-  googleCategoryExpanded: { [key: string]: boolean } = {};
-  searchCategoryExpanded: { [key: string]: boolean } = {};
-  launcherQueue: LaunchableSearch[] = [];
-  launcherTimer: number | null = null;
-  launcherRunning = false;
+  searchLauncherRunning = false;
   cancelSource: CancelTokenSource | null = null;
   scanStartedAt = 0;
   etaTimer: number | null = null;
-  openedUrls = new Set<string>();
-  googleFields = [
-    { key: "dork", label: "Query", thClass: "google-query-column" },
-    { key: "actions", label: "Actions", thClass: "google-actions-column" },
-  ];
-  searxngFields = [
-    { key: "dork", label: "Query", thClass: "searxng-query-column" },
-    { key: "result_count", label: "Results", thClass: "searxng-count-column" },
-    { key: "results", label: "Top results", thClass: "searxng-results-column" },
-    { key: "actions", label: "Actions", thClass: "searxng-actions-column" },
-  ];
   computed = {
     ...mapState(["number"]),
     ...mapMutations(["pushError"]),
@@ -960,76 +535,12 @@ export default class Scanner extends Vue {
     return [{ key: "offline", label: "Offline details", rows: this.localRows }];
   }
 
-  get searchGroupDefinitions(): Omit<GoogleSearchGroup, "items">[] {
-    return [
-      {
-        key: "general",
-        label: "General footprints",
-        description: "Broad exact-number searches and common web mentions.",
-      },
-      {
-        key: "social_media",
-        label: "Social networks",
-        description: "Profile and post searches across major social platforms.",
-      },
-      {
-        key: "individuals",
-        label: "People and identity",
-        description: "Queries aimed at personal listings and identity clues.",
-      },
-      {
-        key: "reputation",
-        label: "Reputation and spam",
-        description: "Spam reports, complaints, and abuse-related mentions.",
-      },
-      {
-        key: "disposable_providers",
-        label: "Temporary number providers",
-        description: "Disposable-number provider searches and public listings.",
-      },
-    ];
-  }
-
-  get googleGroups(): GoogleSearchGroup[] {
-    const response = (this.data || {}) as GoogleSearchResponse;
-
-    return this.searchGroupDefinitions
-      .map((group) => ({
-        ...group,
-        items: response[group.key] || [],
-      }))
-      .filter((group) => group.items.length > 0);
-  }
-
-  get allGoogleDorks(): GoogleSearchDork[] {
-    return this.googleGroups.reduce(
-      (items: GoogleSearchDork[], group: GoogleSearchGroup) =>
-        items.concat(group.items),
-      []
-    );
-  }
-
-  get searxngGroups(): SearXNGGroup[] {
-    const response = (this.data || {}) as SearXNGResponse;
-
-    return this.searchGroupDefinitions
-      .map((group) => ({
-        ...group,
-        items: response[group.key] || [],
-      }))
-      .filter((group) => group.items.length > 0);
-  }
-
-  get matchedSearXNGQueries(): SearXNGQueryResult[] {
-    return this.searxngGroups.reduce(
-      (items: SearXNGQueryResult[], group: SearXNGGroup) =>
-        items.concat(this.matchedRows(group.items)),
-      []
-    );
-  }
-
-  get launcherRemaining(): number {
-    return this.launcherQueue.length;
+  get googlecseResults(): SearchResult[] {
+    return this.googlecseItems.map((item) => ({
+      title: item.title,
+      url: item.url || "",
+      content: item.url,
+    }));
   }
 
   get readyLabel(): string {
@@ -1058,7 +569,6 @@ export default class Scanner extends Vue {
 
   beforeDestroy(): void {
     this.cancelScan();
-    this.stopLauncher();
     this.stopEtaTicker();
   }
 
@@ -1181,84 +691,24 @@ export default class Scanner extends Vue {
     });
   }
 
-  categoryCollapseId(key: string): string {
-    return `${this.collapseId}-${key}`;
+  private get searchGroupsRef():
+    | (Vue & { openAll(): void; openMatches(): void; stop(): void })
+    | undefined {
+    return this.$refs.searchGroups as
+      | (Vue & { openAll(): void; openMatches(): void; stop(): void })
+      | undefined;
   }
 
-  isGoogleCategoryExpanded(key: string): boolean {
-    return this.googleCategoryExpanded[key] === true;
+  openAllSearches(): void {
+    this.searchGroupsRef?.openAll();
   }
 
-  toggleGoogleCategory(key: string): void {
-    this.$set(
-      this.googleCategoryExpanded,
-      key,
-      !this.isGoogleCategoryExpanded(key)
-    );
+  openMatchedSearches(): void {
+    this.searchGroupsRef?.openMatches();
   }
 
-  isSearchCategoryExpanded(key: string): boolean {
-    return this.searchCategoryExpanded[key] === true;
-  }
-
-  toggleSearchCategory(key: string): void {
-    this.$set(
-      this.searchCategoryExpanded,
-      key,
-      !this.isSearchCategoryExpanded(key)
-    );
-  }
-
-  actionButtonId(action: string, groupKey: string, index: number): string {
-    return `${this.collapseId}-${groupKey}-${index}-${action}`;
-  }
-
-  groupMatchCount(rows: SearXNGQueryResult[]): number {
-    return this.matchedRows(rows).length;
-  }
-
-  matchedRows(rows: SearXNGQueryResult[]): SearXNGQueryResult[] {
-    return rows.filter((row) => row.result_count > 0 && !row.error);
-  }
-
-  startLauncher(dorks: LaunchableSearch[]): void {
-    const queued = dorks.filter((dork) => !this.openedUrls.has(dork.url));
-    if (queued.length === 0) {
-      return;
-    }
-
-    this.stopLauncher();
-    this.launcherQueue = queued;
-    this.launcherRunning = true;
-    this.launchNext();
-  }
-
-  stopLauncher(): void {
-    if (this.launcherTimer !== null) {
-      window.clearTimeout(this.launcherTimer);
-      this.launcherTimer = null;
-    }
-    this.launcherRunning = false;
-    this.launcherQueue = [];
-  }
-
-  launchNext(): void {
-    const next = this.launcherQueue.shift();
-    if (!next) {
-      this.stopLauncher();
-      return;
-    }
-
-    this.openedUrls.add(next.url);
-    window.open(next.url, "_blank", "noopener");
-
-    if (this.launcherQueue.length === 0) {
-      this.stopLauncher();
-      return;
-    }
-
-    const delay = 1500 + Math.floor(Math.random() * 3500);
-    this.launcherTimer = window.setTimeout(() => this.launchNext(), delay);
+  stopSearches(): void {
+    this.searchGroupsRef?.stop();
   }
 
   async copyText(text: string): Promise<void> {
@@ -1280,8 +730,7 @@ export default class Scanner extends Vue {
 </script>
 
 <style scoped>
-.scanner-panel-header,
-.google-action-group-header {
+.scanner-panel-header {
   cursor: pointer;
 }
 
@@ -1303,61 +752,6 @@ export default class Scanner extends Vue {
   font-size: 1rem;
   margin-right: 0.5rem;
   width: 1rem;
-}
-
-.google-action-group {
-  margin-bottom: 1rem;
-}
-
-.google-action-group-title {
-  min-width: 16rem;
-}
-
-.google-query {
-  white-space: normal;
-  word-break: break-word;
-}
-
-::v-deep .google-query-column {
-  width: 82%;
-}
-
-::v-deep .google-actions-column {
-  width: 10rem;
-}
-
-::v-deep .searxng-query-column {
-  width: 42%;
-}
-
-::v-deep .searxng-count-column {
-  width: 6rem;
-}
-
-::v-deep .searxng-results-column {
-  width: 38%;
-}
-
-::v-deep .searxng-actions-column {
-  width: 10rem;
-}
-
-.google-action-button {
-  align-items: center;
-  display: inline-flex;
-  height: 2.25rem;
-  justify-content: center;
-  width: 2.25rem;
-}
-
-.searxng-results {
-  min-width: 18rem;
-}
-
-.searxng-result + .searxng-result {
-  border-top: 1px solid #e9ecef;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
 }
 
 .googlecse-counts {
@@ -1387,23 +781,6 @@ export default class Scanner extends Vue {
 
 .googlecse-homepage {
   margin-left: auto;
-}
-
-.googlecse-result {
-  align-items: flex-start;
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-}
-
-.googlecse-result-main {
-  min-width: 0;
-  word-break: break-word;
-}
-
-.googlecse-result-actions {
-  flex-shrink: 0;
-  white-space: nowrap;
 }
 
 .local-banner {
