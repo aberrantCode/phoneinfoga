@@ -412,108 +412,22 @@
           </b-card>
         </div>
 
-        <div v-else-if="isNumverify && hasData" class="numverify-summary">
-          <div class="numverify-status">
-            <b-badge
-              :variant="numverify.valid ? 'success' : 'danger'"
-              class="numverify-status-badge"
-            >
-              <b-icon-check-circle-fill
-                v-if="numverify.valid"
-                aria-hidden="true"
-                class="mr-1"
-              />
-              <b-icon-exclamation-circle-fill
-                v-else
-                aria-hidden="true"
-                class="mr-1"
-              />
-              {{ numverify.valid ? "Valid number" : "Invalid number" }}
-            </b-badge>
-            <span v-if="numverifyHeadline" class="numverify-headline">
-              {{ numverifyHeadline }}
-            </span>
-            <span v-if="numverifyLineType" class="numverify-line-type text-muted">
-              {{ numverifyLineType }} line
-            </span>
-          </div>
+        <ScannerSummary
+          v-else-if="isNumverify && hasData"
+          :badge="numverifyBadge"
+          :headline="numverifyHeadline"
+          :subtext="numverifySubtext"
+          :groups="numverifyGroups"
+          :col-md="4"
+        />
 
-          <b-row class="numverify-groups">
-            <b-col
-              v-for="group in numverifyGroups"
-              :key="group.key"
-              cols="12"
-              md="4"
-              class="mb-3"
-            >
-              <b-card no-body class="numverify-group h-100">
-                <b-card-header class="numverify-group-header">
-                  {{ group.label }}
-                </b-card-header>
-                <b-list-group flush>
-                  <b-list-group-item
-                    v-for="row in group.rows"
-                    :key="row.label"
-                    class="numverify-row"
-                  >
-                    <span class="numverify-row-label text-muted">
-                      {{ row.label }}
-                    </span>
-                    <span class="numverify-row-value">{{ row.value }}</span>
-                  </b-list-group-item>
-                </b-list-group>
-              </b-card>
-            </b-col>
-          </b-row>
-        </div>
-
-        <div v-else-if="isOvh && hasData" class="numverify-summary">
-          <div class="numverify-status">
-            <b-badge
-              :variant="ovh.found ? 'success' : 'secondary'"
-              class="numverify-status-badge"
-            >
-              <b-icon-check-circle-fill
-                v-if="ovh.found"
-                aria-hidden="true"
-                class="mr-1"
-              />
-              <b-icon-dash-circle-fill v-else aria-hidden="true" class="mr-1" />
-              {{ ovh.found ? "Found" : "Not found" }}
-            </b-badge>
-          </div>
-
-          <b-row v-if="ovhGroups.length > 0" class="numverify-groups">
-            <b-col
-              v-for="group in ovhGroups"
-              :key="group.key"
-              cols="12"
-              md="6"
-              class="mb-3"
-            >
-              <b-card no-body class="numverify-group h-100">
-                <b-card-header class="numverify-group-header">
-                  {{ group.label }}
-                </b-card-header>
-                <b-list-group flush>
-                  <b-list-group-item
-                    v-for="row in group.rows"
-                    :key="row.label"
-                    class="numverify-row"
-                  >
-                    <span class="numverify-row-label text-muted">
-                      {{ row.label }}
-                    </span>
-                    <span class="numverify-row-value">{{ row.value }}</span>
-                  </b-list-group-item>
-                </b-list-group>
-              </b-card>
-            </b-col>
-          </b-row>
-          <p v-else class="text-muted mb-0">
-            No additional location details were returned.
-          </p>
-        </div>
+        <ScannerSummary
+          v-else-if="isOvh && hasData"
+          :badge="ovhBadge"
+          :groups="ovhGroups"
+          :col-md="6"
+          empty-text="No additional location details were returned."
+        />
 
         <div v-else-if="isGoogleCSE && hasData" class="googlecse-summary">
           <div class="googlecse-counts">
@@ -599,69 +513,22 @@
           </p>
         </div>
 
-        <div v-else-if="isLocal && hasData" class="numverify-summary local-summary">
-          <div class="numverify-status">
-            <b-badge
-              :variant="localBadge.variant"
-              class="numverify-status-badge"
-            >
-              <b-icon-check-circle-fill
-                v-if="hasMetadata && !localHasChanges"
-                aria-hidden="true"
-                class="mr-1"
-              />
-              <b-icon-exclamation-circle-fill
-                v-else-if="localHasChanges"
-                aria-hidden="true"
-                class="mr-1"
-              />
-              <b-icon-info-circle-fill v-else aria-hidden="true" class="mr-1" />
-              {{ localBadge.label }}
-            </b-badge>
-          </div>
-
-          <b-alert
-            v-if="hasMetadata && !localHasChanges"
-            show
-            variant="light"
-            class="local-banner mb-0"
-          >
+        <ScannerSummary
+          v-else-if="isLocal && hasData && hasMetadata && !localHasChanges"
+          :badge="localBadge"
+        >
+          <b-alert show variant="light" class="local-banner mb-0">
             No new information &mdash; these values match the Metadata panel
             above.
           </b-alert>
+        </ScannerSummary>
 
-          <b-row v-else class="numverify-groups">
-            <b-col cols="12" md="6" class="mb-3">
-              <b-card no-body class="numverify-group h-100">
-                <b-card-header class="numverify-group-header">
-                  Offline details
-                </b-card-header>
-                <b-list-group flush>
-                  <b-list-group-item
-                    v-for="row in localRows"
-                    :key="row.label"
-                    class="numverify-row"
-                    :class="{ 'local-row-changed': row.changed }"
-                  >
-                    <span class="numverify-row-label text-muted">
-                      {{ row.label }}
-                    </span>
-                    <span class="numverify-row-value">
-                      {{ row.value }}
-                      <b-badge
-                        v-if="row.changed"
-                        variant="warning"
-                        class="ml-2 local-row-badge"
-                      >
-                        changed
-                      </b-badge>
-                    </span>
-                  </b-list-group-item>
-                </b-list-group>
-              </b-card>
-            </b-col>
-          </b-row>
-        </div>
+        <ScannerSummary
+          v-else-if="isLocal && hasData"
+          :badge="localBadge"
+          :groups="localGroups"
+          :col-md="6"
+        />
 
         <JsonViewer v-else-if="hasData" :value="data"></JsonViewer>
 
@@ -678,6 +545,10 @@ import { Component, Vue, Prop } from "vue-property-decorator";
 import axios, { CancelTokenSource } from "axios";
 import { mapState, mapMutations } from "vuex";
 import JsonViewer from "vue-json-viewer";
+import ScannerSummary, {
+  SummaryBadge,
+  SummaryGroup,
+} from "./ScannerSummary.vue";
 import config from "@/config";
 
 interface GoogleSearchDork {
@@ -817,6 +688,7 @@ interface LocalRow {
 @Component({
   components: {
     JsonViewer,
+    ScannerSummary,
   },
 })
 export default class Scanner extends Vue {
@@ -909,6 +781,20 @@ export default class Scanner extends Vue {
     return lineType.charAt(0).toUpperCase() + lineType.slice(1);
   }
 
+  get numverifyBadge(): SummaryBadge {
+    return this.numverify.valid
+      ? { variant: "success", label: "Valid number", icon: "check-circle-fill" }
+      : {
+          variant: "danger",
+          label: "Invalid number",
+          icon: "exclamation-circle-fill",
+        };
+  }
+
+  get numverifySubtext(): string {
+    return this.numverifyLineType ? `${this.numverifyLineType} line` : "";
+  }
+
   get numverifyGroups(): NumverifyGroup[] {
     const result = this.numverify;
     const definitions: { key: string; label: string; rows: NumverifyRow[] }[] = [
@@ -970,6 +856,12 @@ export default class Scanner extends Vue {
     }
 
     return [{ key: "location", label: "Location", rows }];
+  }
+
+  get ovhBadge(): SummaryBadge {
+    return this.ovh.found
+      ? { variant: "success", label: "Found", icon: "check-circle-fill" }
+      : { variant: "secondary", label: "Not found", icon: "dash-circle-fill" };
   }
 
   get isGoogleCSE(): boolean {
@@ -1042,14 +934,30 @@ export default class Scanner extends Vue {
     return this.localRows.some((row) => row.changed);
   }
 
-  get localBadge(): { variant: string; label: string } {
+  get localBadge(): SummaryBadge {
     if (!this.hasMetadata) {
-      return { variant: "secondary", label: "Offline details" };
+      return {
+        variant: "secondary",
+        label: "Offline details",
+        icon: "info-circle-fill",
+      };
     }
     if (this.localHasChanges) {
-      return { variant: "warning", label: "Differs from metadata" };
+      return {
+        variant: "warning",
+        label: "Differs from metadata",
+        icon: "exclamation-circle-fill",
+      };
     }
-    return { variant: "success", label: "Matches metadata" };
+    return {
+      variant: "success",
+      label: "Matches metadata",
+      icon: "check-circle-fill",
+    };
+  }
+
+  get localGroups(): SummaryGroup[] {
+    return [{ key: "offline", label: "Offline details", rows: this.localRows }];
   }
 
   get searchGroupDefinitions(): Omit<GoogleSearchGroup, "items">[] {
@@ -1500,76 +1408,5 @@ export default class Scanner extends Vue {
 
 .local-banner {
   border: 1px solid #e9ecef;
-}
-
-.local-row-changed {
-  background-color: #fff8e1;
-}
-
-.local-row-changed .numverify-row-value {
-  color: #8a6d3b;
-  font-weight: 700;
-}
-
-.local-row-badge {
-  font-size: 0.65rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.numverify-status {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-}
-
-.numverify-status-badge {
-  align-items: center;
-  display: inline-flex;
-  font-size: 0.9rem;
-  padding: 0.45rem 0.75rem;
-}
-
-.numverify-headline {
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.numverify-line-type {
-  font-size: 0.95rem;
-}
-
-.numverify-group {
-  border: 1px solid #e9ecef;
-}
-
-.numverify-group-header {
-  background-color: #f8f9fa;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.numverify-row {
-  align-items: baseline;
-  display: flex;
-  justify-content: space-between;
-  padding: 0.6rem 1rem;
-}
-
-.numverify-row-label {
-  font-size: 0.85rem;
-  margin-right: 1rem;
-  white-space: nowrap;
-}
-
-.numverify-row-value {
-  font-weight: 600;
-  text-align: right;
-  word-break: break-word;
 }
 </style>
