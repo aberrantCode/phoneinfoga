@@ -599,6 +599,70 @@
           </p>
         </div>
 
+        <div v-else-if="isLocal && hasData" class="numverify-summary local-summary">
+          <div class="numverify-status">
+            <b-badge
+              :variant="localBadge.variant"
+              class="numverify-status-badge"
+            >
+              <b-icon-check-circle-fill
+                v-if="hasMetadata && !localHasChanges"
+                aria-hidden="true"
+                class="mr-1"
+              />
+              <b-icon-exclamation-circle-fill
+                v-else-if="localHasChanges"
+                aria-hidden="true"
+                class="mr-1"
+              />
+              <b-icon-info-circle-fill v-else aria-hidden="true" class="mr-1" />
+              {{ localBadge.label }}
+            </b-badge>
+          </div>
+
+          <b-alert
+            v-if="hasMetadata && !localHasChanges"
+            show
+            variant="light"
+            class="local-banner mb-0"
+          >
+            No new information &mdash; these values match the Metadata panel
+            above.
+          </b-alert>
+
+          <b-row v-else class="numverify-groups">
+            <b-col cols="12" md="6" class="mb-3">
+              <b-card no-body class="numverify-group h-100">
+                <b-card-header class="numverify-group-header">
+                  Offline details
+                </b-card-header>
+                <b-list-group flush>
+                  <b-list-group-item
+                    v-for="row in localRows"
+                    :key="row.label"
+                    class="numverify-row"
+                    :class="{ 'local-row-changed': row.changed }"
+                  >
+                    <span class="numverify-row-label text-muted">
+                      {{ row.label }}
+                    </span>
+                    <span class="numverify-row-value">
+                      {{ row.value }}
+                      <b-badge
+                        v-if="row.changed"
+                        variant="warning"
+                        class="ml-2 local-row-badge"
+                      >
+                        changed
+                      </b-badge>
+                    </span>
+                  </b-list-group-item>
+                </b-list-group>
+              </b-card>
+            </b-col>
+          </b-row>
+        </div>
+
         <JsonViewer v-else-if="hasData" :value="data"></JsonViewer>
 
         <p v-else-if="!loading" class="text-muted mb-0">
@@ -721,6 +785,35 @@ interface GoogleCSECount {
   value: number;
 }
 
+interface LocalScannerData {
+  raw_local?: string;
+  local?: string;
+  e164?: string;
+  international?: string;
+  country_code?: number;
+  country?: string;
+  carrier?: string;
+}
+
+// Shape returned by /v2/numbers (Scan.vue's localData), used to detect
+// whether the local scanner adds anything beyond the Metadata panel.
+interface LocalMetadata {
+  valid?: boolean;
+  rawLocal?: string;
+  local?: string;
+  e164?: string;
+  international?: string;
+  countryCode?: number;
+  country?: string;
+  carrier?: string;
+}
+
+interface LocalRow {
+  label: string;
+  value: string;
+  changed: boolean;
+}
+
 @Component({
   components: {
     JsonViewer,
@@ -760,6 +853,7 @@ export default class Scanner extends Vue {
   @Prop() name!: string;
   @Prop({ default: false }) autoRun!: boolean;
   @Prop({ default: () => ({}) }) scanOptions!: { [key: string]: number };
+  @Prop({ default: () => ({}) }) metadata!: LocalMetadata;
 
   get collapseId(): string {
     return `scanner-collapse-${this.scanId}`;
@@ -900,6 +994,62 @@ export default class Scanner extends Vue {
       },
       { label: "Requests made", value: result.total_request_count || 0 },
     ];
+  }
+
+  get isLocal(): boolean {
+    return this.scanId === "local";
+  }
+
+  get local(): LocalScannerData {
+    return (this.data || {}) as LocalScannerData;
+  }
+
+  get hasMetadata(): boolean {
+    const m = this.metadata || {};
+    return Boolean(m.e164 || m.international || m.local);
+  }
+
+  get localRows(): LocalRow[] {
+    const data = this.local;
+    const meta = this.metadata || {};
+    const toText = (value: string | number | undefined): string =>
+      value === undefined || value === null ? "" : String(value);
+
+    const definitions = [
+      { label: "Raw local", value: data.raw_local, meta: meta.rawLocal },
+      { label: "Local", value: data.local, meta: meta.local },
+      { label: "E.164", value: data.e164, meta: meta.e164 },
+      { label: "International", value: data.international, meta: meta.international },
+      { label: "Country code", value: data.country_code, meta: meta.countryCode },
+      { label: "Country", value: data.country, meta: meta.country },
+      { label: "Carrier", value: data.carrier, meta: meta.carrier },
+    ];
+
+    return definitions
+      .map((def) => {
+        const value = toText(def.value);
+        const metaValue = toText(def.meta);
+        return {
+          label: def.label,
+          value,
+          changed: this.hasMetadata && value !== metaValue,
+        };
+      })
+      .filter((row) => row.value !== "");
+  }
+
+  get localHasChanges(): boolean {
+    return this.localRows.some((row) => row.changed);
+  }
+
+  get localBadge(): { variant: string; label: string } {
+    if (!this.hasMetadata) {
+      return { variant: "secondary", label: "Offline details" };
+    }
+    if (this.localHasChanges) {
+      return { variant: "warning", label: "Differs from metadata" };
+    }
+    return { variant: "success", label: "Matches metadata" };
   }
 
   get searchGroupDefinitions(): Omit<GoogleSearchGroup, "items">[] {
@@ -1346,6 +1496,25 @@ export default class Scanner extends Vue {
 .googlecse-result-actions {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.local-banner {
+  border: 1px solid #e9ecef;
+}
+
+.local-row-changed {
+  background-color: #fff8e1;
+}
+
+.local-row-changed .numverify-row-value {
+  color: #8a6d3b;
+  font-weight: 700;
+}
+
+.local-row-badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .numverify-status {
