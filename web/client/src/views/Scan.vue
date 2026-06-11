@@ -174,6 +174,7 @@
             :scanId="scanner.name"
             :autoRun="true"
             :scan-options="getScannerRunOptions(scanner.name)"
+            :metadata="localData"
             @status="updateScannerStatus"
           />
         </b-card-body>
