@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,9 +17,10 @@ func Test_ValidatePlugin_Errors(t *testing.T) {
 	}
 
 	testcases := []struct {
-		name    string
-		path    string
-		wantErr string
+		name          string
+		path          string
+		wantErr       string
+		skipOnWindows bool
 	}{
 		{
 			name:    "test with invalid path",
@@ -29,11 +31,18 @@ func Test_ValidatePlugin_Errors(t *testing.T) {
 			name:    "test with invalid plugin",
 			path:    "testdata/invalid.so",
 			wantErr: fmt.Sprintf("given plugin testdata/invalid.so is not valid: plugin.Open(\"testdata/invalid.so\"): %s: file too short", invalidPluginAbsPath),
+			// Go's plugin package is only implemented on linux, darwin and
+			// freebsd; on Windows plugin.Open returns "plugin: not implemented",
+			// so the exact error message below cannot be produced.
+			skipOnWindows: true,
 		},
 	}
 
 	for _, tt := range testcases {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.skipOnWindows && runtime.GOOS == "windows" {
+				t.Skip("Go plugins are not supported on Windows (plugin.Open returns \"plugin: not implemented\")")
+			}
 			err := OpenPlugin(tt.path)
 			assert.EqualError(t, err, tt.wantErr)
 		})

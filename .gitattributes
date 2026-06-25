@@ -1,0 +1,8 @@
+# Golden test fixtures are compared byte-for-byte by the test suite. Pin them to
+# LF so a Windows checkout with core.autocrlf=true cannot rewrite them to CRLF,
+# which would otherwise fail the comparison against the LF output the code emits.
+**/testdata/**/*.txt text eol=lf
+
+# Binary test fixtures (e.g. native Go plugins) must never have line endings
+# converted, regardless of any text rule above.
+**/testdata/**/*.so binary
