@@ -21,3 +21,6 @@ coverage
 coverage.*
 unit-tests.xml
 .idea
+
+# Local distribution archives
+phoneinfoga-twilio.zip
