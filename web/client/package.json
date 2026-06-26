@@ -52,6 +52,11 @@
     "vue-jest": "3.0.7",
     "vue-template-compiler": "2.6.12"
   },
+  "dependenciesMeta": {
+    "deasync@0.1.29": {
+      "built": false
+    }
+  },
   "eslintConfig": {
     "root": true,
     "env": {
