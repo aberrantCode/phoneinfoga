@@ -253,3 +253,147 @@ OVH, besides being a web and cloud hosting company, is a telecom provider with s
     Number range: 036517xxxx
     City: Abbeville
     ```
+
+## HLR
+
+The HLR (Home Location Register) scanner reports the *live* network state of a mobile number: whether it is currently reachable, the carrier serving it after any porting, roaming status and line type. Unlike range/validation lookups it reflects the number's state right now, so providers bill per lookup. It is provider-agnostic: point it at any HLR/MNP provider (Abstract HLR, IPQS HLR, apilayer, …) via `HLR_API_URL`.
+
+The scanner only runs for **mobile** numbers (re-derived with libphonenumber) and is skipped cleanly until both an API key and a real `HLR_API_URL` are configured.
+
+??? info "Configuration"
+
+    | Environment variable | Option        | Default | Description                                                              |
+    |----------------------|---------------|---------|--------------------------------------------------------------------------|
+    | HLR_API_KEY          | HLR_API_KEY   |         | Provider API key.                                                        |
+    | HLR_API_URL          | HLR_API_URL   |         | Provider lookup endpoint. Required; the scanner skips while it is empty. |
+
+??? example "Output example"
+
+    ```shell
+    $ HLR_API_KEY=<key> HLR_API_URL=https://hlr.example.com/lookup phoneinfoga scan -n +33612345678
+
+    Results for hlr
+    Active: true
+    Status: active
+    Current carrier: Orange
+    Line type: mobile
+    Country: FR
+    ```
+
+## IPQualityScore
+
+IPQualityScore scores a phone number for fraud and abuse signals (fraud score, recent abuse, VOIP/prepaid/risky flags) alongside carrier, line type and coarse geography. Requires an API key obtained from your IPQualityScore account.
+
+[Read documentation](https://www.ipqualityscore.com/documentation/phone-number-validation-api/overview)
+
+??? info "Configuration"
+
+    | Environment variable | Option       | Default | Description                                            |
+    |----------------------|--------------|---------|--------------------------------------------------------|
+    | IPQS_API_KEY         | IPQS_API_KEY |         | API key to authenticate to the IPQualityScore API.     |
+
+??? example "Output example"
+
+    ```shell
+    $ IPQS_API_KEY=<key> phoneinfoga scan -n +14159929960
+
+    Results for ipqualityscore
+    Valid: true
+    Active: true
+    Fraud score: 0
+    Recent abuse: false
+    VOIP: false
+    Prepaid: false
+    Risky: false
+    Line type: Wireless
+    Carrier: T-Mobile USA
+    Country: US
+    ```
+
+## Validation (Veriphone, Abstract, Numlookup)
+
+These are drop-in alternatives to Numverify, each providing standard validation data (validity, formats, country, carrier, line type). They share one scanner implementation but register as three independent scanners — configure only the providers you use; each runs when its own key is present.
+
+| Scanner name   | Provider     | Documentation                                            |
+|----------------|--------------|----------------------------------------------------------|
+| `veriphone`    | Veriphone    | <https://veriphone.io/docs>                              |
+| `abstract`     | Abstract     | <https://www.abstractapi.com/api/phone-validation-api>   |
+| `numlookupapi` | NumlookupAPI | <https://numlookupapi.com/docs>                          |
+
+??? info "Configuration"
+
+    | Environment variable    | Option                  | Default | Description                                  |
+    |-------------------------|-------------------------|---------|----------------------------------------------|
+    | VERIPHONE_API_KEY       | VERIPHONE_API_KEY       |         | API key for the Veriphone validator.         |
+    | ABSTRACT_PHONE_API_KEY  | ABSTRACT_PHONE_API_KEY  |         | API key for the Abstract phone validator.    |
+    | NUMLOOKUPAPI_API_KEY    | NUMLOOKUPAPI_API_KEY    |         | API key for the NumlookupAPI validator.      |
+
+??? example "Output example"
+
+    ```shell
+    $ VERIPHONE_API_KEY=<key> phoneinfoga scan -n +14159929960
+
+    Results for veriphone
+    Provider: veriphone
+    Valid: true
+    International format: +1 415-992-9960
+    Country name: United States
+    Carrier: Bandwidth.com
+    Line type: MOBILE
+    ```
+
+## NANPA
+
+The NANPA scanner resolves North American (+1) numbers to their NPA-NXX allocation: rate center, state, carrier-of-record (OCN) and LATA. It generalizes the range concept the `ovh` scanner provides for parts of Europe to the North American Numbering Plan, behind a configurable endpoint.
+
+It runs only for **+1** numbers and is skipped cleanly while `NANPA_API_URL` is empty. `NANPA_API_KEY` is optional and only sent when your provider requires it.
+
+??? info "Configuration"
+
+    | Environment variable | Option         | Default | Description                                                            |
+    |----------------------|----------------|---------|------------------------------------------------------------------------|
+    | NANPA_API_URL        | NANPA_API_URL  |         | NPA-NXX lookup endpoint. Required; the scanner skips while it is empty. |
+    | NANPA_API_KEY        | NANPA_API_KEY  |         | Optional API key, only if the provider requires authentication.        |
+
+??? example "Output example"
+
+    ```shell
+    $ NANPA_API_URL=https://npa-nxx.example.com/v1 phoneinfoga scan -n +12025550123
+
+    Results for nanpa
+    Found: true
+    Area code: 202
+    Exchange: 555
+    Rate center: WASHINGTON DC
+    State: DC
+    OCN: 0001
+    Carrier of record: Example Telco
+    LATA: 236
+    ```
+
+## SerpAPI
+
+SerpAPI runs the same phone-number footprint dorks as the `googlesearch` scanner, but executes them through [SerpAPI](https://serpapi.com/) and returns parsed organic results automatically (rather than links you open manually). Useful for programmatic footprinting across one or more search engines.
+
+??? info "Configuration"
+
+    | Environment variable | Option              | Default  | Description                                                       |
+    |----------------------|---------------------|----------|-------------------------------------------------------------------|
+    | SERPAPI_KEY          | SERPAPI_KEY         |          | API key to authenticate to SerpAPI.                              |
+    | SERPAPI_ENGINES      | SERPAPI_ENGINES     | google   | Comma-separated SerpAPI engines to query.                        |
+    | SERPAPI_MAX_RESULTS  | SERPAPI_MAX_RESULTS | 3        | Maximum organic results kept per dork (0 means unlimited).       |
+
+??? example "Output example"
+
+    ```shell
+    $ SERPAPI_KEY=<key> phoneinfoga scan -n +14159929960
+
+    Results for serpapi
+    Reputation:
+        Query: site:whocalled.us inurl:"4159929960"
+        Engine: google
+        Result count: 2
+        Results:
+            Title: Who called from 415-992-9960?
+            URL: https://whocalled.us/...
+    ```

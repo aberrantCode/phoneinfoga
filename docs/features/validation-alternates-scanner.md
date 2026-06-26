@@ -4,7 +4,7 @@
 |---|---|
 | **Scanner IDs** | `veriphone`, `abstract`, `numlookupapi` |
 | **Category** | Number validation (Numverify alternatives / redundancy) |
-| **Status** | Draft — proposed |
+| **Status** | Implemented |
 | **External dependency** | Veriphone, Abstract Phone Validation, NumlookupAPI |
 | **Auth** | API key (per provider) |
 | **Default state** | Each skipped unless its own API key is configured |
@@ -59,7 +59,7 @@ requests/month with no card; Veriphone and NumlookupAPI offer free developer tie
 |---|---|---|---|
 | Veriphone | `GET https://api.veriphone.io/v2/verify?phone={E164}&key={key}` | query key | `phone_valid`, `phone_type`, `carrier`, `country`, `phone_region` |
 | Abstract | `GET https://phonevalidation.abstractapi.com/v1/?api_key={key}&phone={E164}` | query key | `valid`, `type`, `carrier`, `country.name`, `location` |
-| NumlookupAPI | `GET https://api.numlookupapi.com/v1/validate/{E164}?apikey={key}` | query key / header | `valid`, `line_type`, `carrier`, `country_name`, `location` |
+| NumlookupAPI | `GET https://api.numlookupapi.com/v1/validate/{E164}` (key sent as `apikey` **header**) | header key | `valid`, `line_type`, `carrier`, `country_name`, `location` |
 
 All three are single-request, JSON, and conceptually identical to the Numverify
 validate call.

@@ -4,7 +4,7 @@
 |---|---|
 | **Scanner ID** | `serpapi` |
 | **Category** | Web footprint (search execution) |
-| **Status** | Draft — proposed |
+| **Status** | Implemented |
 | **External dependency** | SerpAPI (unified Google / Bing / DuckDuckGo / Yandex) |
 | **Auth** | API key |
 | **Default state** | Skipped unless an API key is configured |
