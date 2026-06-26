@@ -4,7 +4,7 @@
 |---|---|
 | **Scanner ID** | `nanpa` |
 | **Category** | Number intelligence (range / rate-center allocation) |
-| **Status** | Draft — proposed |
+| **Status** | Implemented (API mode only) |
 | **External dependency** | NANPA / NPA-NXX data (public dataset or commercial API) |
 | **Auth** | None (public dataset) or API key (commercial provider) |
 | **Default state** | Skipped unless the number is in the North American Numbering Plan (country code 1) |
@@ -126,9 +126,18 @@ type NANPAScannerResponse struct {
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `NANPA_API_KEY` | only in commercial-API mode | — | API key. |
-| `NANPA_API_URL` | no | provider default | Commercial endpoint override. |
-| `NANPA_DATASET_PATH` | only in dataset mode | bundled path | Location of the local NPA-NXX table. |
+| `NANPA_API_KEY` | no | — | Optional API key, only if the provider requires authentication. |
+| `NANPA_API_URL` | yes | — | NPA-NXX lookup endpoint. The scanner skips cleanly while it is empty. |
+
+> **Implementation note.** Only the **commercial-API mode** shipped. The supplier
+> (`lib/remote/suppliers/nanpa.go`) issues
+> `GET {NANPA_API_URL}?npa={npa}&nxx={nxx}[&api_key={key}]` and maps a generic
+> response; `DryRun` requires both a `+1` country code and a non-empty
+> `NANPA_API_URL`, otherwise the scanner is skipped. The offline
+> dataset mode (`NANPA_DATASET_PATH`, `suppliers/nanpa_dataset.go`) is **not yet
+> implemented** — it remains future work behind the same
+> `NumberingPlanSupplierInterface`. Adjust the response JSON tags to match the
+> chosen NPA-NXX provider.
 
 ## 9. Supplier interface & testing
 

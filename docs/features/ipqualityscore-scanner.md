@@ -4,7 +4,7 @@
 |---|---|
 | **Scanner ID** | `ipqualityscore` |
 | **Category** | Reputation / fraud scoring |
-| **Status** | Draft — proposed |
+| **Status** | Implemented |
 | **External dependency** | IPQualityScore Phone Validation API |
 | **Auth** | API key |
 | **Default state** | Skipped unless an API key is configured |

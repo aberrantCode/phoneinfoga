@@ -4,10 +4,10 @@
 |---|---|
 | **Scanner ID** | `hlr` |
 | **Category** | Number intelligence (live network status) |
-| **Status** | Draft — proposed |
+| **Status** | Implemented |
 | **External dependency** | A configurable HLR/MNP provider (e.g. Abstract, apilayer, IPQS HLR) |
 | **Auth** | API key |
-| **Default state** | Skipped unless an API key is configured **and** the number is mobile |
+| **Default state** | Skipped unless an API key **and** a real `HLR_API_URL` are configured **and** the number is mobile |
 | **Supplier** | Yes (`HLRSupplierInterface`) |
 
 ---
@@ -132,7 +132,17 @@ type HLRScannerResponse struct {
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `HLR_API_KEY` | yes | — | Provider API key. |
-| `HLR_API_URL` | no | provider default | Override for self-hosting or provider swap. |
+| `HLR_API_URL` | yes | — | Provider lookup endpoint. No working endpoint ships by default; the compiled-in value is an explicit placeholder. |
+
+> **Implementation note.** No provider is shipped wired by default — `HLR_API_URL`
+> carries a placeholder host. `DryRun` treats an empty *or* placeholder URL as
+> "unconfigured" and skips the scanner cleanly, so an operator must set
+> `HLR_API_URL` to a real provider endpoint before the scanner runs. The supplier
+> request shape is `GET {HLR_API_URL}?api_key={key}&number={E164}` and the response
+> JSON tags in `lib/remote/suppliers/hlr.go` may need adjusting to match the chosen
+> provider. The concrete supplier signature is
+> `Lookup(baseURL, apiKey, e164 string)` (the base URL is threaded per call so it
+> can be configured through scanner options).
 
 ## 9. Supplier interface & testing
 
