@@ -7,6 +7,7 @@ import (
 func InitScanners(remote *Library) {
 	numverifySupplier := suppliers.NewNumverifySupplier()
 	ovhSupplier := suppliers.NewOVHSupplier()
+	dehashedSupplier := suppliers.NewDehashedSupplier()
 
 	remote.AddScanner(NewLocalScanner())
 	remote.AddScanner(NewNumverifyScanner(numverifySupplier))
@@ -14,6 +15,7 @@ func InitScanners(remote *Library) {
 	remote.AddScanner(NewSearXNGScanner(nil))
 	remote.AddScanner(NewOVHScanner(ovhSupplier))
 	remote.AddScanner(NewGoogleCSEScanner(nil))
+	remote.AddScanner(NewBreachScanner(dehashedSupplier))
 
 	remote.LoadPlugins()
 }
