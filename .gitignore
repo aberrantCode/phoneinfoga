@@ -24,3 +24,8 @@ unit-tests.xml
 
 # Local distribution archives
 phoneinfoga-twilio.zip
+
+# Environment / secrets — never commit real credentials
+.env
+.env.*
+!.env.example
