@@ -37,8 +37,8 @@ func (s *Server) registerRoutes(disableClient bool) error {
 
 	group.
 		GET("/", healthHandler).
-		GET("/config", getConfig).
-		POST("/config", updateConfig).
+		GET("/config", loopbackOnly(), getConfig).
+		POST("/config", loopbackOnly(), updateConfig).
 		GET("/numbers", getAllNumbers).
 		GET("/numbers/:number/validate", ValidateScanURL, validate).
 		GET("/numbers/:number/scan/local", ValidateScanURL, localScan).

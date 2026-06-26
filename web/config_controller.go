@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 
@@ -20,7 +21,6 @@ var configurableKeys = []string{
 	"DEHASHED_EMAIL",
 	"DEHASHED_API_KEY",
 	"BREACH_INCLUDE_FIELDS",
-	"DEHASHED_API_URL",
 }
 
 // secretKeys holds the configurable keys whose values must never be returned
@@ -44,6 +44,28 @@ type configFieldStatus struct {
 type configStatusResponse struct {
 	JSONResponse
 	Fields []configFieldStatus `json:"fields"`
+}
+
+// loopbackOnly restricts a route to clients connecting over the loopback
+// interface. The config endpoints read and write live scanner credentials, so
+// they must never be reachable from the network even when the web server is
+// bound to a non-loopback address.
+func loopbackOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+		if err != nil {
+			host = c.Request.RemoteAddr
+		}
+		ip := net.ParseIP(host)
+		if ip == nil || !ip.IsLoopback() {
+			c.AbortWithStatusJSON(http.StatusForbidden, JSONResponse{
+				Success: false,
+				Error:   "config endpoint is restricted to loopback connections",
+			})
+			return
+		}
+		c.Next()
+	}
 }
 
 func isConfigurableKey(key string) bool {
@@ -116,6 +138,14 @@ func getConfig(c *gin.Context) {
 // @Success 400 {object} JSONResponse
 // @Router /config [post]
 func updateConfig(c *gin.Context) {
+	// Require an explicit JSON content type. This forces a CORS preflight for
+	// cross-origin callers, defeating the "simple request" CSRF vector where a
+	// malicious page POSTs text/plain to mutate runtime credentials.
+	if c.ContentType() != "application/json" {
+		handleError(c, errors.NewBadRequest(fmt.Errorf("content-type must be application/json")))
+		return
+	}
+
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handleError(c, errors.NewBadRequest(err))

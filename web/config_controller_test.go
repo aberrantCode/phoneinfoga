@@ -12,12 +12,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func performJSONRequest(r http.Handler, method, path, body string) *httptest.ResponseRecorder {
+func performConfigRequest(r http.Handler, method, path, body, contentType, remoteAddr string) *httptest.ResponseRecorder {
 	req, _ := http.NewRequest(method, path, bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.RemoteAddr = remoteAddr
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
+}
+
+// performJSONRequest issues a JSON request from a loopback client, the normal
+// case for the config endpoints.
+func performJSONRequest(r http.Handler, method, path, body string) *httptest.ResponseRecorder {
+	return performConfigRequest(r, method, path, body, "application/json", "127.0.0.1:54321")
 }
 
 func findField(fields []configFieldStatus, key string) (configFieldStatus, bool) {
@@ -104,5 +113,20 @@ func TestConfigController(t *testing.T) {
 	t.Run("POST /api/config rejects malformed JSON", func(t *testing.T) {
 		res := performJSONRequest(srv, http.MethodPost, "/api/config", `{not json`)
 		assert.Equal(t, http.StatusBadRequest, res.Result().StatusCode)
+	})
+
+	t.Run("POST /api/config rejects non-JSON content type (CSRF defense)", func(t *testing.T) {
+		res := performConfigRequest(srv, http.MethodPost, "/api/config",
+			`{"BREACH_SCANNER_ENABLED":"true"}`, "text/plain", "127.0.0.1:54321")
+		assert.Equal(t, http.StatusBadRequest, res.Result().StatusCode)
+	})
+
+	t.Run("config endpoints reject non-loopback clients", func(t *testing.T) {
+		get := performConfigRequest(srv, http.MethodGet, "/api/config", "", "application/json", "203.0.113.5:40000")
+		assert.Equal(t, http.StatusForbidden, get.Result().StatusCode)
+
+		post := performConfigRequest(srv, http.MethodPost, "/api/config",
+			`{"BREACH_SCANNER_ENABLED":"true"}`, "application/json", "203.0.113.5:40000")
+		assert.Equal(t, http.StatusForbidden, post.Result().StatusCode)
 	})
 }
