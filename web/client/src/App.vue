@@ -53,6 +53,7 @@
             <b-tooltip target="scanner-preferences-button">
               Scanner preferences
             </b-tooltip>
+            <scanner-credentials />
           </b-navbar-nav>
         </b-container>
       </b-navbar>
@@ -170,6 +171,7 @@ import Vue from "vue";
 import { mapState } from "vuex";
 import config from "@/config";
 import axios, { AxiosResponse } from "axios";
+import ScannerCredentials from "@/components/ScannerCredentials.vue";
 import {
   getDefaultScannerNames,
   getScannerAvailability,
@@ -183,6 +185,7 @@ import {
 type HealthResponse = { success: boolean; version: string; demo: boolean };
 
 export default Vue.extend({
+  components: { ScannerCredentials },
   data: () => ({
     config,
     version: "",
