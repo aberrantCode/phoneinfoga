@@ -4130,6 +4130,9 @@ __metadata:
     vue-router: legacy
     vue-template-compiler: 2.6.12
     vuex: 3.6.2
+  dependenciesMeta:
+    deasync@0.1.29:
+      built: false
   languageName: unknown
   linkType: soft
 
