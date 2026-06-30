@@ -3,22 +3,19 @@
     <div>
       <b-navbar toggleable="lg" type="dark" variant="dark">
         <b-container>
-          <b-navbar-brand to="/">
-            <img
-              src="@/assets/logo.svg"
-              class="d-inline-block align-top"
-              width="30"
-              height="30"
-              alt="logo"
-            />
-            {{ config.appName }}
+          <b-navbar-brand to="/" class="ac-app-brand">
+            <span class="ac-brand-logo">
+              <img src="@/assets/logo.svg" width="48" height="48" alt="logo" />
+            </span>
+            <span class="ac-app-brand-text">
+              <span class="ac-title"
+                >{{ config.appName }} <span class="ac-title__sub">OSINT</span></span
+              >
+              <span class="ac-app-brand-desc ac-mono">{{
+                config.appDescription
+              }}</span>
+            </span>
           </b-navbar-brand>
-
-          <b-collapse id="nav-text-collapse" is-nav>
-            <b-navbar-nav>
-              <b-nav-text>{{ config.appDescription }}</b-nav-text>
-            </b-navbar-nav>
-          </b-collapse>
 
           <b-navbar-nav class="ml-auto">
             <b-collapse id="nav-collapse" is-nav>
@@ -40,6 +37,42 @@
                 >
               </b-navbar-nav>
             </b-collapse>
+            <button
+              class="ac-tool ml-2"
+              type="button"
+              :aria-pressed="themeResolved === 'light' ? 'true' : 'false'"
+              :title="themeToggleTitle"
+              :aria-label="themeToggleTitle"
+              @click="toggleTheme"
+            >
+              <svg
+                class="i-light"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path
+                  d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+                />
+              </svg>
+              <svg
+                class="i-dark"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+              </svg>
+            </button>
             <b-button
               id="scanner-preferences-button"
               variant="outline-light"
@@ -57,6 +90,10 @@
           </b-navbar-nav>
         </b-container>
       </b-navbar>
+      <!-- Energized rail — the powered-bus signature cue, under the masthead. -->
+      <b-container>
+        <div class="ac-rail" role="presentation"></div>
+      </b-container>
     </div>
 
     <b-modal
@@ -135,27 +172,25 @@
       </b-row>
     </b-container>
 
-    <b-navbar
-      toggleable="lg"
-      type="light"
-      variant="light"
-      fixed="bottom"
-      v-if="version !== ''"
-    >
+    <!-- Footer status strip — uppercase mono telemetry, dot-separated. -->
+    <footer class="ac-app-footer" v-if="version !== ''">
       <b-container>
-        <b-navbar-nav class="ml-auto">
-          <b-collapse id="nav-collapse" is-nav>
-            <b-navbar-nav>
-              <b-nav-item
-                href="https://github.com/sundowndev/phoneinfoga/releases"
-                target="_blank"
-                >{{ config.appName }} {{ version }}</b-nav-item
-              >
-            </b-navbar-nav>
-          </b-collapse>
-        </b-navbar-nav>
+        <div class="ac-rail" role="presentation"></div>
+        <div class="ac-statusbar mt-3">
+          <span>{{ config.appName }}</span>
+          <span class="ac-statusbar__sep">·</span>
+          <span>{{ themeResolved === "light" ? "Light" : "Dark" }}</span>
+          <span class="ac-statusbar__sep">·</span>
+          <span>Build</span>
+          <a
+            class="ac-statusbar__value"
+            href="https://github.com/sundowndev/phoneinfoga/releases"
+            target="_blank"
+            >{{ version }}</a
+          >
+        </div>
       </b-container>
-    </b-navbar>
+    </footer>
     <script
       v-if="isDemo"
       type="application/javascript"
@@ -184,6 +219,13 @@ import {
 
 type HealthResponse = { success: boolean; version: string; demo: boolean };
 
+// Globals exposed by the AC theme module inlined in public/index.html.
+type AcThemeWindow = Window & {
+  __acGetTheme?: () => string;
+  __acGetResolvedTheme?: () => string;
+  __acSetTheme?: (mode: string) => void;
+};
+
 export default Vue.extend({
   components: { ScannerCredentials },
   data: () => ({
@@ -195,9 +237,16 @@ export default Vue.extend({
     scannerPreferencesLoading: false,
     scannerPreferencesError: "",
     searxngDelayMs: 750,
+    themeMode: "dark",
+    themeResolved: "dark",
   }),
   computed: {
     ...mapState(["number", "errors"]),
+    themeToggleTitle(): string {
+      return this.themeResolved === "light"
+        ? "Switch to dark theme"
+        : "Switch to light theme";
+    },
   },
   async created() {
     const res: AxiosResponse<HealthResponse> = await axios.get(config.apiUrl);
@@ -205,8 +254,32 @@ export default Vue.extend({
     this.version = res.data.version;
     this.isDemo = res.data.demo;
   },
+  mounted() {
+    this.syncTheme();
+    window.addEventListener("ac-theme-changed", this.syncTheme);
+  },
+  beforeDestroy() {
+    window.removeEventListener("ac-theme-changed", this.syncTheme);
+  },
   methods: {
     getScannerDisplayName,
+    syncTheme(): void {
+      const w = window as AcThemeWindow;
+      this.themeMode =
+        typeof w.__acGetTheme === "function" ? w.__acGetTheme() : "dark";
+      this.themeResolved =
+        typeof w.__acGetResolvedTheme === "function"
+          ? w.__acGetResolvedTheme()
+          : "dark";
+    },
+    toggleTheme(): void {
+      const w = window as AcThemeWindow;
+      const next = this.themeResolved === "light" ? "dark" : "light";
+      if (typeof w.__acSetTheme === "function") {
+        w.__acSetTheme(next);
+      }
+      this.syncTheme();
+    },
     scannerUnavailableText(error?: string): string {
       return error ? `Unavailable: ${error}` : "Unavailable";
     },
@@ -239,3 +312,31 @@ export default Vue.extend({
   },
 });
 </script>
+
+<style scoped>
+.ac-app-brand {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--ac-space-4);
+  margin-right: var(--ac-space-4);
+  padding: 0;
+}
+
+.ac-app-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.ac-app-brand-desc {
+  color: var(--muted);
+  font-size: 0.7rem;
+  margin-top: 0.2rem;
+  white-space: normal;
+}
+
+.ac-app-footer {
+  margin-top: var(--ac-space-8);
+  padding-bottom: 2rem;
+}
+</style>

@@ -738,7 +738,7 @@ export default class Scanner extends Vue {
   align-items: center;
   background: transparent;
   border: 0;
-  color: #212529;
+  color: var(--ink);
   display: inline-flex;
   font-size: 1.15rem;
   font-weight: 600;
@@ -768,7 +768,10 @@ export default class Scanner extends Vue {
 }
 
 .googlecse-count-value {
+  color: var(--accent);
+  font-family: var(--ac-font-mono);
   font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   line-height: 1.1;
 }
@@ -784,6 +787,6 @@ export default class Scanner extends Vue {
 }
 
 .local-banner {
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--rule-soft);
 }
 </style>

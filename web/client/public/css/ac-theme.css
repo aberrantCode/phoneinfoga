@@ -1,0 +1,497 @@
+/* ===========================================================================
+   AC shared theme — "PCB phosphor console"  (PhoneInfoga adoption)
+   ---------------------------------------------------------------------------
+   Two layers:
+     1. The AC token ladder + base + signature .ac-* classes, copied VERBATIM
+        from AC_DESIGN/artifacts/styles/shared-theme.css (token NAMES are the
+        contract — do not rename).
+     2. A Bootstrap 4 / BootstrapVue "bridge" that re-skins the framework classes
+        PhoneInfoga emits (.card, .btn, .navbar, .form-control, .table, .modal,
+        .alert, .badge, ...) onto those tokens — the lowest-risk migration path
+        from AC_DESIGN/reference/implementation-reference.md.
+
+   Loaded AFTER bootstrap.min.css / bootstrap-vue.min.css so the cascade wins.
+   Theme is carried by data-theme="dark|light" on <html> (set in index.html).
+   =========================================================================== */
+
+/* ===== 1a. tokens ========================================================= */
+
+:root {
+  --brand-h: 152;
+  --grid-line: color-mix(in oklch, var(--rule) 14%, transparent);
+
+  --ac-font-sans: 'Segoe UI Variable Text', 'Segoe UI', ui-sans-serif, system-ui,
+                  -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --ac-font-mono: 'Cascadia Code', 'JetBrains Mono', ui-monospace, 'SF Mono',
+                  Menlo, Consolas, monospace;
+
+  --ac-radius-md: 0.5rem;
+  --ac-space-2: 0.5rem;
+  --ac-space-4: 1rem;
+  --ac-space-6: 1.5rem;
+  --ac-space-8: 2rem;
+}
+
+/* DARK — powered board (default). */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:          oklch(0.135 0.012 152);
+  --surface-1:   oklch(0.178 0.014 152);
+  --surface-2:   oklch(0.220 0.016 152);
+  --ink:         oklch(0.945 0.022 152);
+  --ink-soft:    oklch(0.800 0.032 152);
+  --muted:       oklch(0.620 0.030 152);
+  --faint:       oklch(0.460 0.022 152);
+  --rule:        oklch(0.300 0.022 152);
+  --rule-soft:   oklch(0.232 0.018 152);
+  --accent:      oklch(0.860 0.205 152);
+  --accent-dim:  oklch(0.560 0.130 152);
+  --accent-glow: oklch(0.860 0.205 152 / 0.42);
+  --solder:      oklch(0.820 0.014 232);
+  --focus-ring:  oklch(0.860 0.205 152 / 0.34);
+  --led-up:      oklch(0.840 0.200 150);
+  --led-down:    oklch(0.640 0.220 26);
+  --led-warn:    oklch(0.820 0.160 88);
+  --panel-shadow: 0 0 0 1px oklch(0.30 0.02 152 / 0.7),
+                  0 24px 60px -16px oklch(0 0 0 / 0.88);
+}
+
+/* LIGHT — silkscreen board. */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg:          oklch(0.918 0.018 152);
+  --surface-1:   oklch(0.892 0.020 152);
+  --surface-2:   oklch(0.955 0.012 152);
+  --ink:         oklch(0.250 0.046 152);
+  --ink-soft:    oklch(0.405 0.050 152);
+  --muted:       oklch(0.510 0.040 152);
+  --faint:       oklch(0.640 0.030 152);
+  --rule:        oklch(0.798 0.024 152);
+  --rule-soft:   oklch(0.852 0.020 152);
+  --accent:      oklch(0.500 0.165 152);
+  --accent-dim:  oklch(0.640 0.110 152);
+  --accent-glow: oklch(0.500 0.165 152 / 0.24);
+  --solder:      oklch(0.500 0.022 232);
+  --focus-ring:  oklch(0.500 0.165 152 / 0.30);
+  --led-up:      oklch(0.540 0.170 150);
+  --led-down:    oklch(0.540 0.200 26);
+  --led-warn:    oklch(0.620 0.150 80);
+  --panel-shadow: 0 1px 2px oklch(0.25 0.04 152 / 0.12),
+                  0 18px 40px -14px oklch(0.25 0.04 152 / 0.24);
+}
+
+/* ===== 1b. base =========================================================== */
+
+html {
+  font-family: var(--ac-font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 2.25rem 2.25rem, 2.25rem 2.25rem;
+  background-position: -1px -1px, -1px -1px;
+  background-attachment: fixed;
+  color: var(--ink);
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  transition: background-color 200ms cubic-bezier(0.25, 1, 0.5, 1),
+              color            200ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  body { transition: none; }
+}
+
+/* One phosphor focus ring for every interactive control. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  border-radius: 4px;
+}
+
+/* ===== 1c. signature .ac-* classes ======================================== */
+
+.ac-title {
+  font-size: clamp(1.02rem, 1.8vw, 1.28rem);
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.ac-title__sub {
+  font-size: 0.6em;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: var(--accent);
+}
+
+.ac-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.9rem; height: 2.9rem;
+  flex-shrink: 0;
+  background: #050505;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  overflow: hidden;
+  padding: 0.45rem;
+}
+.ac-brand-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+.ac-mono { font-family: var(--ac-font-mono); font-variant-numeric: tabular-nums; }
+.ac-text-muted { color: var(--muted); }
+.ac-text-accent { color: var(--accent); }
+
+/* Square icon tool button (theme toggle, etc.). */
+.ac-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem; height: 2rem;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.ac-tool:hover, .ac-tool:focus-visible { border-color: var(--accent); color: var(--accent); }
+.ac-tool[aria-pressed="true"],
+.ac-tool--active {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px -3px var(--accent-glow);
+}
+.ac-tool svg { width: 14px; height: 14px; }
+[data-theme="dark"]  .ac-tool .i-dark  { display: none; }
+[data-theme="dark"]  .ac-tool .i-light { display: block; }
+[data-theme="light"] .ac-tool .i-dark  { display: block; }
+[data-theme="light"] .ac-tool .i-light { display: none; }
+
+/* Energized rail — the powered-bus signature cue. */
+.ac-rail {
+  position: relative;
+  height: 1px;
+  margin: 0 auto;
+  background: linear-gradient(90deg,
+    var(--accent-dim), var(--accent) 12%, var(--accent) 88%, var(--accent-dim));
+  box-shadow: 0 0 10px -2px var(--accent-glow);
+}
+.ac-rail::before,
+.ac-rail::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 9px 1px var(--accent-glow);
+  transform: translateY(-50%);
+}
+.ac-rail::before { left: 0; }
+.ac-rail::after  { right: 0; }
+@media (prefers-reduced-motion: reduce) { .ac-rail { box-shadow: none; } }
+
+/* Standalone status LED + dot-labelled status pill. */
+.ac-led {
+  display: inline-block;
+  width: 0.55rem; height: 0.55rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px 0 color-mix(in oklch, currentColor 55%, transparent);
+  flex-shrink: 0;
+}
+.ac-led--up   { color: var(--led-up); }
+.ac-led--down { color: var(--led-down); }
+.ac-led--warn { color: var(--led-warn); }
+
+.ac-status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; }
+.ac-status::before {
+  content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+.ac-status--up   { color: var(--led-up); }
+.ac-status--down { color: var(--led-down); }
+.ac-status--warn { color: var(--led-warn); }
+
+/* Footer status strip — uppercase mono telemetry, dot-separated. */
+.ac-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--ac-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ac-statusbar a { color: inherit; text-decoration: none; }
+.ac-statusbar a:hover { color: var(--accent); }
+.ac-statusbar__sep   { color: var(--rule); user-select: none; }
+.ac-statusbar__value { color: var(--ink-soft); }
+
+/* ===========================================================================
+   2. Bootstrap 4 / BootstrapVue bridge — token-driven, so it tracks the theme.
+   =========================================================================== */
+
+/* ---- text & utility colors ---------------------------------------------- */
+.text-muted { color: var(--muted) !important; }
+.text-dark  { color: var(--ink) !important; }
+.text-danger { color: var(--led-down) !important; }
+.text-success { color: var(--led-up) !important; }
+.text-warning { color: var(--led-warn) !important; }
+hr { border-top-color: var(--rule-soft); }
+a { color: var(--accent); }
+a:hover { color: var(--accent); }
+
+/* ---- surfaces ----------------------------------------------------------- */
+.bg-white, .bg-light { background-color: var(--surface-2) !important; color: var(--ink); }
+.bg-dark { background-color: color-mix(in oklch, var(--bg) 88%, var(--surface-1)) !important; }
+
+/* ---- navbar (masthead) -------------------------------------------------- */
+.navbar {
+  background: color-mix(in oklch, var(--bg) 88%, var(--surface-1)) !important;
+  border-bottom: 1px solid var(--rule);
+}
+.navbar-dark .navbar-brand,
+.navbar-dark .navbar-nav .nav-link { color: var(--ink); }
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link:focus { color: var(--accent); }
+.navbar-dark .navbar-text { color: var(--muted); }
+.navbar-dark .navbar-toggler { border-color: var(--rule); color: var(--ink); }
+
+/* ---- cards -------------------------------------------------------------- */
+.card {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--ac-radius-md);
+  box-shadow: var(--panel-shadow);
+  color: var(--ink);
+}
+.card-header {
+  background: color-mix(in oklch, var(--surface-2) 70%, var(--surface-1));
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+}
+.card-body { color: var(--ink); }
+
+/* ---- buttons ------------------------------------------------------------ */
+.btn {
+  border-radius: var(--ac-radius-md);
+  transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+/* Primary commit = lit phosphor outline (energised edge over heavy fill). */
+.btn-outline-primary,
+.btn-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 10%, transparent);
+}
+.btn-outline-primary:hover, .btn-primary:hover,
+.btn-outline-primary:focus, .btn-primary:focus {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 18%, transparent);
+  box-shadow: 0 0 16px -4px var(--accent-glow);
+}
+/* Neutral / secondary / dark / light → hairline surface button. */
+.btn-dark, .btn-light, .btn-secondary,
+.btn-outline-secondary, .btn-outline-light, .btn-outline-dark {
+  background: var(--surface-1);
+  border-color: var(--rule);
+  color: var(--ink);
+}
+.btn-dark:hover, .btn-light:hover, .btn-secondary:hover,
+.btn-outline-secondary:hover, .btn-outline-light:hover, .btn-outline-dark:hover {
+  background: var(--surface-1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Destructive / warning / success keep their LED hue as an outline. */
+.btn-danger, .btn-outline-danger {
+  background: color-mix(in oklch, var(--led-down) 10%, transparent);
+  border-color: var(--led-down);
+  color: var(--led-down);
+}
+.btn-danger:hover, .btn-outline-danger:hover {
+  background: color-mix(in oklch, var(--led-down) 20%, transparent);
+  border-color: var(--led-down);
+  color: var(--led-down);
+}
+.btn-warning, .btn-outline-warning {
+  background: color-mix(in oklch, var(--led-warn) 12%, transparent);
+  border-color: var(--led-warn);
+  color: var(--led-warn);
+}
+.btn-success, .btn-outline-success {
+  background: color-mix(in oklch, var(--led-up) 12%, transparent);
+  border-color: var(--led-up);
+  color: var(--led-up);
+}
+.btn:disabled, .btn.disabled { opacity: 0.45; }
+
+/* ---- badges (state pills) ----------------------------------------------- */
+.badge {
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.badge-success { background: color-mix(in oklch, var(--led-up) 16%, transparent);   color: var(--led-up);   border-color: color-mix(in oklch, var(--led-up) 45%, transparent); }
+.badge-danger  { background: color-mix(in oklch, var(--led-down) 16%, transparent); color: var(--led-down); border-color: color-mix(in oklch, var(--led-down) 45%, transparent); }
+.badge-warning { background: color-mix(in oklch, var(--led-warn) 16%, transparent); color: var(--led-warn); border-color: color-mix(in oklch, var(--led-warn) 45%, transparent); }
+.badge-primary, .badge-info {
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in oklch, var(--accent) 45%, transparent);
+}
+.badge-secondary, .badge-light, .badge-dark {
+  background: var(--surface-1);
+  color: var(--ink-soft);
+  border-color: var(--rule);
+}
+
+/* ---- alerts ------------------------------------------------------------- */
+.alert { border-radius: var(--ac-radius-md); border-width: 1px; }
+.alert-danger  { background: color-mix(in oklch, var(--led-down) 12%, var(--surface-2)); border-color: color-mix(in oklch, var(--led-down) 40%, transparent); color: var(--ink); }
+.alert-warning { background: color-mix(in oklch, var(--led-warn) 12%, var(--surface-2)); border-color: color-mix(in oklch, var(--led-warn) 40%, transparent); color: var(--ink); }
+.alert-success { background: color-mix(in oklch, var(--led-up) 12%, var(--surface-2));   border-color: color-mix(in oklch, var(--led-up) 40%, transparent);   color: var(--ink); }
+.alert-info    { background: color-mix(in oklch, var(--accent) 10%, var(--surface-2));   border-color: color-mix(in oklch, var(--accent) 35%, transparent);   color: var(--ink); }
+.alert-light   { background: var(--surface-1); border-color: var(--rule); color: var(--ink); }
+
+/* ---- forms -------------------------------------------------------------- */
+.form-control, .custom-select {
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
+  border: 1px solid var(--rule);
+  border-radius: var(--ac-radius-md);
+  color: var(--ink);
+}
+.form-control::placeholder { color: var(--faint); }
+.form-control:focus, .custom-select:focus {
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
+  border-color: var(--accent);
+  color: var(--ink);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.form-control:disabled, .form-control[readonly] {
+  background: var(--surface-1);
+  opacity: 0.7;
+}
+.input-group-text {
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  color: var(--muted);
+}
+label, .col-form-label { color: var(--ink); }
+
+/* custom checkbox — control box lights to phosphor when checked */
+.custom-control-label { color: var(--ink); }
+.custom-control-label::before {
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
+  border-color: var(--rule);
+}
+.custom-control-input:checked ~ .custom-control-label::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.custom-control-input:focus ~ .custom-control-label::before {
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* ---- tables ------------------------------------------------------------- */
+.table { color: var(--ink); }
+.table th {
+  border-bottom: 1px solid var(--rule);
+  border-top: 0;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.table td { border-top: 1px solid var(--rule-soft); }
+.table-hover tbody tr:hover { background: var(--surface-1); color: var(--ink); }
+
+/* ---- list group --------------------------------------------------------- */
+.list-group-item {
+  background: transparent;
+  border-color: var(--rule-soft);
+  color: var(--ink);
+}
+
+/* ---- modal / dropdown / tooltip ----------------------------------------- */
+.modal-content {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--ac-radius-md);
+  box-shadow: var(--panel-shadow);
+  color: var(--ink);
+}
+.modal-header, .modal-footer { border-color: var(--rule); }
+.modal-title { color: var(--ink); }
+.close { color: var(--ink); text-shadow: none; opacity: 0.7; }
+.close:hover { color: var(--accent); opacity: 1; }
+.dropdown-menu {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+}
+.dropdown-item { color: var(--ink); }
+.dropdown-item:hover, .dropdown-item:focus { background: var(--surface-1); color: var(--accent); }
+.tooltip-inner {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+.tooltip .arrow::before { border-top-color: var(--rule); border-bottom-color: var(--rule); }
+
+/* ---- vue-json-viewer (raw scanner output) ------------------------------- */
+.jv-container.jv-light,
+.jv-container {
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
+  border: 1px solid var(--rule);
+  border-radius: var(--ac-radius-md);
+  color: var(--ink);
+}
+.jv-container.jv-light .jv-key { color: var(--ink-soft); }
+.jv-container.jv-light .jv-item.jv-string { color: var(--accent); }
+.jv-container.jv-light .jv-item.jv-number { color: var(--solder); }
+.jv-container.jv-light .jv-item.jv-boolean { color: var(--led-warn); }
+.jv-container.jv-light .jv-item.jv-object,
+.jv-container.jv-light .jv-item.jv-array { color: var(--muted); }
+.jv-container .jv-code { padding: 0.75rem 1rem; }
+
+/* ---- vue-phone-number-input (main lookup field) ------------------------- */
+.input-tel__input,
+.country-selector__input {
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1)) !important;
+  border-color: var(--rule) !important;
+  color: var(--ink) !important;
+}
+.input-tel__label,
+.country-selector__label { color: var(--muted) !important; }
+.input-tel__input:hover,
+.country-selector__input:hover { border-color: var(--accent) !important; }
+.country-selector__toggle { color: var(--muted); }
+.country-selector__list {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+.country-selector__list__item:hover,
+.country-selector__list__item.selected {
+  background: var(--surface-1) !important;
+  color: var(--accent) !important;
+}
+.dots-text { color: var(--muted); }

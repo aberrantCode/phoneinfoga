@@ -339,7 +339,7 @@ export default Vue.extend({
   align-items: center;
   background: transparent;
   border: 0;
-  color: #212529;
+  color: var(--ink);
   display: inline-flex;
   font-size: 1.15rem;
   font-weight: 600;
@@ -355,7 +355,7 @@ export default Vue.extend({
 }
 
 .metadata-item {
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--rule-soft);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -363,9 +363,10 @@ export default Vue.extend({
 }
 
 .metadata-label {
-  color: #6c757d;
+  color: var(--muted);
   font-size: 0.8rem;
   font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
