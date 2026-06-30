@@ -8,6 +8,8 @@
         <button
           class="scanner-panel-toggle"
           type="button"
+          v-b-tooltip.hover
+          :title="scannerDescription"
           :aria-expanded="expanded ? 'true' : 'false'"
           :aria-controls="collapseId"
           @click.stop="expanded = !expanded"
@@ -193,6 +195,7 @@ import ScannerSummary, {
 } from "./ScannerSummary.vue";
 import SearchActionGroups from "./SearchActionGroups.vue";
 import SearchResultList, { SearchResult } from "./SearchResultList.vue";
+import { getScannerDescription } from "@/utils";
 import config from "@/config";
 
 interface NumverifyResult {
@@ -306,6 +309,10 @@ export default class Scanner extends Vue {
     return `scanner-collapse-${this.scanId}`;
   }
 
+  get scannerDescription(): string {
+    return getScannerDescription(this.scanId);
+  }
+
   get displayName(): string {
     if (this.scanId === "googlesearch") {
       return "Google search";
@@ -343,9 +350,7 @@ export default class Scanner extends Vue {
   }
 
   get numverifyHeadline(): string {
-    return (
-      this.numverify.international_format || this.numverify.number || ""
-    );
+    return this.numverify.international_format || this.numverify.number || "";
   }
 
   get numverifyLineType(): string {
@@ -372,7 +377,11 @@ export default class Scanner extends Vue {
 
   get numverifyGroups(): NumverifyGroup[] {
     const result = this.numverify;
-    const definitions: { key: string; label: string; rows: NumverifyRow[] }[] = [
+    const definitions: {
+      key: string;
+      label: string;
+      rows: NumverifyRow[];
+    }[] = [
       {
         key: "formats",
         label: "Number formats",
@@ -486,8 +495,16 @@ export default class Scanner extends Vue {
       { label: "Raw local", value: data.raw_local, meta: meta.rawLocal },
       { label: "Local", value: data.local, meta: meta.local },
       { label: "E.164", value: data.e164, meta: meta.e164 },
-      { label: "International", value: data.international, meta: meta.international },
-      { label: "Country code", value: data.country_code, meta: meta.countryCode },
+      {
+        label: "International",
+        value: data.international,
+        meta: meta.international,
+      },
+      {
+        label: "Country code",
+        value: data.country_code,
+        meta: meta.countryCode,
+      },
       { label: "Country", value: data.country, meta: meta.country },
       { label: "Carrier", value: data.carrier, meta: meta.carrier },
     ];
@@ -636,7 +653,12 @@ export default class Scanner extends Vue {
         this.emitStatus("canceled", `${this.displayName} canceled`);
       } else {
         this.error = error;
-        this.emitStatus("error", `${this.displayName} failed`);
+        this.emitStatus(
+          "error",
+          `${this.displayName} failed`,
+          undefined,
+          this.errorText(error)
+        );
       }
       this.expanded = true;
     }
@@ -678,17 +700,36 @@ export default class Scanner extends Vue {
       return this.estimatedDurationMs;
     }
 
-    return Math.max(0, this.estimatedDurationMs - (Date.now() - this.scanStartedAt));
+    return Math.max(
+      0,
+      this.estimatedDurationMs - (Date.now() - this.scanStartedAt)
+    );
   }
 
-  emitStatus(status: string, message: string, etaMs?: number): void {
+  emitStatus(
+    status: string,
+    message: string,
+    etaMs?: number,
+    error?: string
+  ): void {
     this.$emit("status", {
       scanId: this.scanId,
       scanner: this.displayName,
       status,
       message,
       etaMs,
+      error,
     });
+  }
+
+  private errorText(error: unknown): string {
+    if (typeof error === "string") {
+      return error;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
   }
 
   private get searchGroupsRef():
@@ -738,7 +779,7 @@ export default class Scanner extends Vue {
   align-items: center;
   background: transparent;
   border: 0;
-  color: #212529;
+  color: var(--ink);
   display: inline-flex;
   font-size: 1.15rem;
   font-weight: 600;
@@ -768,7 +809,10 @@ export default class Scanner extends Vue {
 }
 
 .googlecse-count-value {
+  color: var(--accent);
+  font-family: var(--ac-font-mono);
   font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   line-height: 1.1;
 }
@@ -784,6 +828,6 @@ export default class Scanner extends Vue {
 }
 
 .local-banner {
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--rule-soft);
 }
 </style>

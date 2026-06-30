@@ -1,15 +1,14 @@
 <template>
   <span>
-    <b-button
+    <button
       id="scanner-credentials-button"
-      variant="outline-light"
-      size="sm"
-      class="ml-2"
+      class="ac-tool ml-2"
+      type="button"
       aria-label="Scanner credentials"
       @click="$bvModal.show('scanner-credentials-modal')"
     >
       <b-icon-key-fill aria-hidden="true" />
-    </b-button>
+    </button>
     <b-tooltip target="scanner-credentials-button">
       Scanner credentials
     </b-tooltip>

@@ -83,7 +83,9 @@
                 >
                   <b-icon-box-arrow-up-right aria-hidden="true" />
                 </b-button>
-                <b-tooltip :target="actionButtonId('open', group.key, row.index)">
+                <b-tooltip
+                  :target="actionButtonId('open', group.key, row.index)"
+                >
                   Open query in Google
                 </b-tooltip>
                 <b-button
@@ -153,7 +155,9 @@
                   {{ group.items.length }}
                 </b-badge>
                 <b-badge
-                  :variant="groupMatchCount(group.items) > 0 ? 'success' : 'light'"
+                  :variant="
+                    groupMatchCount(group.items) > 0 ? 'success' : 'light'
+                  "
                   class="ml-1"
                 >
                   {{ groupMatchCount(group.items) }} matched
@@ -206,7 +210,13 @@
               </template>
               <template #cell(result_count)="row">
                 <b-badge
-                  :variant="row.item.error ? 'warning' : row.item.result_count > 0 ? 'success' : 'secondary'"
+                  :variant="
+                    row.item.error
+                      ? 'warning'
+                      : row.item.result_count > 0
+                      ? 'success'
+                      : 'secondary'
+                  "
                 >
                   {{ row.item.error ? "Error" : row.item.result_count }}
                 </b-badge>
@@ -238,7 +248,9 @@
                   Open query in SearXNG
                 </b-tooltip>
                 <b-button
-                  :id="actionButtonId('searxng-copy-query', group.key, row.index)"
+                  :id="
+                    actionButtonId('searxng-copy-query', group.key, row.index)
+                  "
                   variant="outline-secondary"
                   size="sm"
                   class="search-action-button mr-1 mb-1"
@@ -310,7 +322,12 @@ interface SearXNGQueryResult {
   dork: string;
   url: string;
   result_count: number;
-  results?: { title?: string; url: string; content?: string; engine?: string }[];
+  results?: {
+    title?: string;
+    url: string;
+    content?: string;
+    engine?: string;
+  }[];
   error?: string;
 }
 

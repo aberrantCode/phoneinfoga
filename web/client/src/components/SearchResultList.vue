@@ -84,7 +84,7 @@ export default class SearchResultList extends Vue {
 }
 
 .search-result + .search-result {
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--rule-soft);
   margin-top: 0.75rem;
   padding-top: 0.75rem;
 }

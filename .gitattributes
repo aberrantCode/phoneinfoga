@@ -1,3 +1,11 @@
+# Default for every text file: let Git auto-detect text vs binary, and pin the
+# working-tree line endings to LF. eol=lf overrides a developer's
+# core.autocrlf=true (common on Windows), so checkouts are pure LF and Prettier
+# (endOfLine: lf) does not flag CRLF (the "Delete `␍`" warnings). The git blobs
+# are already stored as LF, so this only changes how files land on disk.
+# More-specific rules below override this default per path.
+* text=auto eol=lf
+
 # Golden test fixtures are compared byte-for-byte by the test suite. Pin them to
 # LF so a Windows checkout with core.autocrlf=true cannot rewrite them to CRLF,
 # which would otherwise fail the comparison against the LF output the code emits.

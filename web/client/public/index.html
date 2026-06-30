@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- Dark is the default; the theme module below promotes a stored/explicit
+     choice. data-theme is set up-front so there is no light-mode flash. -->
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -8,6 +10,52 @@
     <title>PhoneInfoga</title>
     <link type="text/css" rel="stylesheet" href="<%= BASE_URL %>css/bootstrap.min.css" />
     <link type="text/css" rel="stylesheet" href="<%= BASE_URL %>css/bootstrap-vue.min.css" />
+    <!-- AC "PCB phosphor console" theme — MUST load after bootstrap so it wins. -->
+    <link type="text/css" rel="stylesheet" href="<%= BASE_URL %>css/ac-theme.css" />
+    <!-- ===== AC theme module (no-flash) — adapted from AC_DESIGN app-shell.html.
+         Contract: data-theme on <html>, persisted under one localStorage key.
+         Modes: 'dark' (default) | 'light' | 'system' (follows the OS live).
+         Runs in <head> so a stored light choice applies before first paint.
+         The toolbar toggle lives inside the Vue app (App.vue), which calls the
+         exposed window.__acSetTheme / __acGetTheme globals once mounted. -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var KEY  = 'ac-theme';
+        var mql  = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+        function resolve(mode) {
+          if (mode === 'system') return (mql && mql.matches) ? 'dark' : 'light';
+          return mode === 'light' ? 'light' : 'dark';
+        }
+        function getMode() {
+          try {
+            var v = localStorage.getItem(KEY);
+            return (v === 'light' || v === 'dark' || v === 'system') ? v : 'dark';
+          } catch (e) { return 'dark'; }
+        }
+        function applyTheme(mode) {
+          root.setAttribute('data-theme', resolve(mode));
+          try { localStorage.setItem(KEY, mode); } catch (e) { /* ignore */ }
+          try {
+            window.dispatchEvent(new CustomEvent('ac-theme-changed', {
+              detail: { mode: mode, theme: resolve(mode) },
+            }));
+          } catch (e) { /* ignore */ }
+        }
+        window.__acSetTheme = applyTheme;
+        window.__acGetTheme = getMode;
+        window.__acGetResolvedTheme = function () { return root.getAttribute('data-theme') || 'dark'; };
+
+        applyTheme(getMode());
+
+        if (mql) {
+          var onChange = function () { if (getMode() === 'system') applyTheme('system'); };
+          if (mql.addEventListener) mql.addEventListener('change', onChange);
+          else if (mql.addListener) mql.addListener(onChange);
+        }
+      })();
+    </script>
   </head>
   <body>
     <noscript>

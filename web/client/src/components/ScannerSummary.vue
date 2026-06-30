@@ -120,14 +120,15 @@ export default class ScannerSummary extends Vue {
 }
 
 .scanner-summary-group {
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--rule);
 }
 
 .scanner-summary-group-header {
-  background-color: #f8f9fa;
+  background-color: color-mix(in oklch, var(--surface-2) 70%, var(--surface-1));
+  color: var(--muted);
   font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -151,11 +152,11 @@ export default class ScannerSummary extends Vue {
 }
 
 .scanner-summary-row-changed {
-  background-color: #fff8e1;
+  background-color: color-mix(in oklch, var(--led-warn) 14%, transparent);
 }
 
 .scanner-summary-row-changed .scanner-summary-row-value {
-  color: #8a6d3b;
+  color: var(--led-warn);
   font-weight: 700;
 }
 
