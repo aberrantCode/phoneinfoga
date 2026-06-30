@@ -36,7 +36,9 @@ describe("ScannerSummary.vue", () => {
       },
     });
 
-    expect(wrapper.find(".scanner-summary-headline").text()).toBe("In progress");
+    expect(wrapper.find(".scanner-summary-headline").text()).toBe(
+      "In progress"
+    );
     expect(wrapper.find(".scanner-summary-subtext").text()).toBe(
       "Querying providers"
     );

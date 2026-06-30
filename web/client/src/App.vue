@@ -9,7 +9,8 @@
             </span>
             <span class="ac-app-brand-text">
               <span class="ac-title"
-                >{{ config.appName }} <span class="ac-title__sub">OSINT</span></span
+                >{{ config.appName }}
+                <span class="ac-title__sub">OSINT</span></span
               >
               <span class="ac-app-brand-desc ac-mono">{{
                 config.appDescription
@@ -91,11 +92,7 @@
         {{ scannerPreferencesError }}
       </b-alert>
       <b-spinner v-if="scannerPreferencesLoading" small type="grow" />
-      <b-form-checkbox-group
-        v-else
-        v-model="preferredScannerNames"
-        stacked
-      >
+      <b-form-checkbox-group v-else v-model="preferredScannerNames" stacked>
         <b-form-checkbox
           v-for="scanner in scannerPreferences"
           :key="scanner.name"

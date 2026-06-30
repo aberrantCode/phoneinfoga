@@ -35,8 +35,7 @@ const getScanners = async (): Promise<ScannerObject[]> => {
   // Local is already shown in the information panel. OVH is intentionally
   // hidden from the web scanners panel because the public lookup is low-signal.
   return res.data.scanners.filter(
-    (scanner: ScannerObject) =>
-      !hiddenScannerNames.includes(scanner.name)
+    (scanner: ScannerObject) => !hiddenScannerNames.includes(scanner.name)
   );
 };
 
@@ -57,12 +56,9 @@ const getScannerDescription = (name: string): string => {
       "Offline libphonenumber analysis: formatting, country, line type and carrier — no external calls.",
     numverify:
       "Numverify API: real-time validation, carrier, line type and location.",
-    veriphone:
-      "Veriphone API: validation, carrier, line type and country.",
-    abstract:
-      "Abstract API: phone validation, carrier and line type.",
-    numlookupapi:
-      "NumLookupAPI: validation, carrier and location lookup.",
+    veriphone: "Veriphone API: validation, carrier, line type and country.",
+    abstract: "Abstract API: phone validation, carrier and line type.",
+    numlookupapi: "NumLookupAPI: validation, carrier and location lookup.",
     ovh: "Looks up OVH Telecom's public number ranges (French numbers).",
     googlesearch:
       "Generates ready-to-run Google dork queries (footprints) across social, docs and reputation sites.",
@@ -92,7 +88,9 @@ const getPreferredScannerNames = (): string[] | null => {
     }
 
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((name) => typeof name === "string") : null;
+    return Array.isArray(parsed)
+      ? parsed.filter((name) => typeof name === "string")
+      : null;
   } catch {
     return null;
   }
@@ -119,7 +117,9 @@ const setSearXNGDelayMs = (delayMs: number): void => {
   window.localStorage.setItem(SEARXNG_DELAY_KEY, String(Math.floor(value)));
 };
 
-const getScannerRunOptions = (scannerName: string): { [key: string]: number } => {
+const getScannerRunOptions = (
+  scannerName: string
+): { [key: string]: number } => {
   if (scannerName !== "searxng") {
     return {};
   }
@@ -129,9 +129,7 @@ const getScannerRunOptions = (scannerName: string): { [key: string]: number } =>
   };
 };
 
-const getDefaultScannerNames = (
-  scanners: ScannerAvailability[]
-): string[] => {
+const getDefaultScannerNames = (scanners: ScannerAvailability[]): string[] => {
   const configured = scanners
     .filter((scanner) => scanner.available)
     .map((scanner) => scanner.name);
