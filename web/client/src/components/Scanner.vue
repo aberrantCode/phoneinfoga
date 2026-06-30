@@ -643,7 +643,12 @@ export default class Scanner extends Vue {
         this.emitStatus("canceled", `${this.displayName} canceled`);
       } else {
         this.error = error;
-        this.emitStatus("error", `${this.displayName} failed`);
+        this.emitStatus(
+          "error",
+          `${this.displayName} failed`,
+          undefined,
+          this.errorText(error)
+        );
       }
       this.expanded = true;
     }
@@ -688,14 +693,30 @@ export default class Scanner extends Vue {
     return Math.max(0, this.estimatedDurationMs - (Date.now() - this.scanStartedAt));
   }
 
-  emitStatus(status: string, message: string, etaMs?: number): void {
+  emitStatus(
+    status: string,
+    message: string,
+    etaMs?: number,
+    error?: string
+  ): void {
     this.$emit("status", {
       scanId: this.scanId,
       scanner: this.displayName,
       status,
       message,
       etaMs,
+      error,
     });
+  }
+
+  private errorText(error: unknown): string {
+    if (typeof error === "string") {
+      return error;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
   }
 
   private get searchGroupsRef():
