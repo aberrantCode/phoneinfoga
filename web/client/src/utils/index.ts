@@ -51,6 +51,39 @@ const getScannerDisplayName = (name: string): string => {
   return labels[name] || name.charAt(0).toUpperCase() + name.slice(1);
 };
 
+const getScannerDescription = (name: string): string => {
+  const descriptions: { [key: string]: string } = {
+    local:
+      "Offline libphonenumber analysis: formatting, country, line type and carrier — no external calls.",
+    numverify:
+      "Numverify API: real-time validation, carrier, line type and location.",
+    veriphone:
+      "Veriphone API: validation, carrier, line type and country.",
+    abstract:
+      "Abstract API: phone validation, carrier and line type.",
+    numlookupapi:
+      "NumLookupAPI: validation, carrier and location lookup.",
+    ovh: "Looks up OVH Telecom's public number ranges (French numbers).",
+    googlesearch:
+      "Generates ready-to-run Google dork queries (footprints) across social, docs and reputation sites.",
+    googlecse:
+      "Searches a Google Custom Search Engine for pages mentioning the number.",
+    searxng:
+      "Runs the Google dork footprints through a SearXNG instance and returns matches.",
+    hlr: "HLR lookup: live network/roaming status and ported-number detection.",
+    ipqualityscore:
+      "IPQualityScore: fraud/risk score, active-line and line-type checks.",
+    nanpa:
+      "North American Numbering Plan: validates US/Canada area codes and exchanges.",
+    serpapi: "SerpApi: search-engine results mentioning the number.",
+    twilio: "Twilio Lookup: carrier, line type and caller-name (CNAM).",
+    breach: "Checks data-breach datasets for records linked to the number.",
+    validation: "Validates the number's format and basic metadata.",
+  };
+
+  return descriptions[name] || `${getScannerDisplayName(name)} scanner.`;
+};
+
 const getPreferredScannerNames = (): string[] | null => {
   try {
     const value = window.localStorage.getItem(SCANNER_PREFERENCES_KEY);
@@ -150,6 +183,7 @@ export {
   getScanners,
   getScannerAvailability,
   getScannerDisplayName,
+  getScannerDescription,
   getDefaultScannerNames,
   getPreferredScannerNames,
   setPreferredScannerNames,

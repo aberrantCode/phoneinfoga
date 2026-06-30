@@ -8,6 +8,8 @@
         <button
           class="scanner-panel-toggle"
           type="button"
+          v-b-tooltip.hover
+          :title="scannerDescription"
           :aria-expanded="expanded ? 'true' : 'false'"
           :aria-controls="collapseId"
           @click.stop="expanded = !expanded"
@@ -193,6 +195,7 @@ import ScannerSummary, {
 } from "./ScannerSummary.vue";
 import SearchActionGroups from "./SearchActionGroups.vue";
 import SearchResultList, { SearchResult } from "./SearchResultList.vue";
+import { getScannerDescription } from "@/utils";
 import config from "@/config";
 
 interface NumverifyResult {
@@ -304,6 +307,10 @@ export default class Scanner extends Vue {
 
   get collapseId(): string {
     return `scanner-collapse-${this.scanId}`;
+  }
+
+  get scannerDescription(): string {
+    return getScannerDescription(this.scanId);
   }
 
   get displayName(): string {

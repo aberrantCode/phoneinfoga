@@ -43,6 +43,8 @@
           <label
             v-for="scanner in availableScanners"
             :key="scanner.name"
+            v-b-tooltip.hover
+            :title="getScannerDescription(scanner.name)"
             class="scanner-toggle"
             :class="{
               'scanner-toggle-active': selectedScannerNames.includes(
@@ -192,6 +194,7 @@ import {
   getDefaultScannerNames,
   getScannerAvailability,
   getScannerDisplayName,
+  getScannerDescription,
   getScannerRunOptions,
   ScannerAvailability,
 } from "../utils";
@@ -342,6 +345,7 @@ export default Vue.extend({
   },
   methods: {
     getScannerDisplayName,
+    getScannerDescription,
     getScannerRunOptions,
     clearData() {
       this.isLookup = false;
@@ -502,44 +506,47 @@ export default Vue.extend({
 .scanner-selector-toolbar {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+  flex-direction: column;
+  gap: 0.85rem;
   justify-content: center;
 }
 
 .scanner-selector-label {
   color: var(--ink-soft);
   font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .scanner-toggle-list {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  justify-content: center;
+  width: 100%;
 }
 
+/* A scanner toggle reads as a recessed well, like the phone-number field. */
 .scanner-toggle {
   align-items: center;
-  background: var(--surface-1);
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
   border: 1px solid var(--rule);
   border-radius: var(--ac-radius-md);
   color: var(--ink);
   cursor: pointer;
   display: inline-flex;
   font-weight: 500;
-  gap: 0.4rem;
+  gap: 0.45rem;
   line-height: 1;
   margin: 0;
   min-height: 2rem;
-  padding: 0.4rem 0.6rem;
+  padding: 0.45rem 0.75rem;
   transition: background-color 0.12s ease, border-color 0.12s ease,
-    color 0.12s ease, box-shadow 0.12s ease;
+    color 0.12s ease;
   user-select: none;
 }
 
 .scanner-toggle:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-dim);
 }
 
 .scanner-toggle input {
@@ -560,18 +567,21 @@ export default Vue.extend({
   width: 1rem;
 }
 
-/* Selected scanner = a powered phosphor trace (same language as .ac-tool). */
+/* Selected scanner — the same quiet recessed well, with the border lit to a
+   de-energised trace (accent-dim), not the full-bright phosphor. */
 .scanner-toggle-active {
-  background: color-mix(in oklch, var(--accent) 10%, transparent);
-  border-color: var(--accent);
-  box-shadow: 0 0 12px -3px var(--accent-glow);
-  color: var(--accent);
+  background: color-mix(in oklch, var(--bg) 50%, var(--surface-1));
+  border-color: var(--accent-dim);
+  color: var(--ink);
 }
 
+/* The checked box matches the phone-number field: a neutral recessed well with
+   a hairline --rule border. The tick stays a quiet de-energised phosphor so the
+   selected state is still legible without out-shouting the field. */
 .scanner-toggle-active .scanner-toggle-check {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
+  border-color: var(--rule);
+  color: var(--accent-dim);
 }
 
 .metadata-grid {

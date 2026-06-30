@@ -18,25 +18,6 @@
           </b-navbar-brand>
 
           <b-navbar-nav class="ml-auto">
-            <b-collapse id="nav-collapse" is-nav>
-              <b-navbar-nav>
-                <b-nav-item
-                  href="https://github.com/sundowndev/phoneinfoga"
-                  target="_blank"
-                  >GitHub</b-nav-item
-                >
-                <b-nav-item
-                  href="https://sundowndev.github.io/phoneinfoga/resources/"
-                  target="_blank"
-                  >Resources</b-nav-item
-                >
-                <b-nav-item
-                  href="https://sundowndev.github.io/phoneinfoga/"
-                  target="_blank"
-                  >Documentation</b-nav-item
-                >
-              </b-navbar-nav>
-            </b-collapse>
             <button
               class="ac-tool ml-2"
               type="button"
@@ -73,16 +54,15 @@
                 <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
               </svg>
             </button>
-            <b-button
+            <button
               id="scanner-preferences-button"
-              variant="outline-light"
-              size="sm"
-              class="ml-2"
+              class="ac-tool ml-2"
+              type="button"
               aria-label="Scanner preferences"
               @click="$bvModal.show('scanner-preferences-modal')"
             >
               <b-icon-gear-fill aria-hidden="true" />
-            </b-button>
+            </button>
             <b-tooltip target="scanner-preferences-button">
               Scanner preferences
             </b-tooltip>
@@ -173,7 +153,7 @@
     </b-container>
 
     <!-- Footer status strip — uppercase mono telemetry, dot-separated. -->
-    <footer class="ac-app-footer" v-if="version !== ''">
+    <footer class="ac-app-footer">
       <b-container>
         <div class="ac-rail" role="presentation"></div>
         <div class="ac-statusbar mt-3">
@@ -181,12 +161,12 @@
           <span class="ac-statusbar__sep">·</span>
           <span>{{ themeResolved === "light" ? "Light" : "Dark" }}</span>
           <span class="ac-statusbar__sep">·</span>
-          <span>Build</span>
+          <span>Version</span>
           <a
             class="ac-statusbar__value"
             href="https://github.com/sundowndev/phoneinfoga/releases"
             target="_blank"
-            >{{ version }}</a
+            >{{ version || "dev" }}</a
           >
         </div>
       </b-container>
@@ -338,5 +318,11 @@ export default Vue.extend({
 .ac-app-footer {
   margin-top: var(--ac-space-8);
   padding-bottom: 2rem;
+}
+
+/* Keep the right-aligned masthead tools (theme, preferences, credentials)
+   the same size and vertically centered. */
+.navbar-nav.ml-auto {
+  align-items: center;
 }
 </style>
