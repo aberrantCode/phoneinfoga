@@ -31,7 +31,7 @@
       </b-form-group>
     </b-form>
 
-    <div v-if="!isLookup" class="scanner-selector">
+    <div v-if="!isLookup && inputNumberValid" class="scanner-selector">
       <div class="scanner-selector-toolbar">
         <span class="scanner-selector-label">Scanners:</span>
         <b-spinner v-if="scannerLoading" small type="grow" />
@@ -227,6 +227,7 @@ interface Data {
   scannersExpanded: boolean;
   inputNumber: string;
   inputNumberVal: string;
+  inputNumberValid: boolean;
   scanEvent: Vue;
   scannerAvailability: ScannerAvailability[];
   selectedScannerNames: string[];
@@ -271,6 +272,7 @@ export default Vue.extend({
       scannersExpanded: true,
       inputNumber: "",
       inputNumberVal: "",
+      inputNumberValid: false,
       scanEvent: new Vue(),
       scannerAvailability: [],
       selectedScannerNames: [],
@@ -403,6 +405,7 @@ export default Vue.extend({
     },
     updateInputNumber(val: InputNumberObject) {
       this.inputNumber = val.e164;
+      this.inputNumberValid = Boolean(val.isValid);
     },
     async getScanners() {
       try {
