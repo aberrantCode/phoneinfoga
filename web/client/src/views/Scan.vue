@@ -41,24 +41,27 @@
           class="scanner-toggle-list"
         >
           <label
-            v-for="scanner in availableScanners"
+            v-for="scanner in selectableScanners"
             :key="scanner.name"
             v-b-tooltip.hover
-            :title="getScannerDescription(scanner.name)"
+            :title="scannerToggleTitle(scanner)"
             class="scanner-toggle"
             :class="{
-              'scanner-toggle-active': selectedScannerNames.includes(
-                scanner.name
-              ),
+              'scanner-toggle-active':
+                scanner.available &&
+                selectedScannerNames.includes(scanner.name),
+              'scanner-toggle-error': !scanner.available,
             }"
           >
             <input
               v-model="selectedScannerNames"
               type="checkbox"
               :value="scanner.name"
+              :disabled="!scanner.available"
             />
             <span class="scanner-toggle-check" aria-hidden="true">
-              <b-icon-check />
+              <b-icon-exclamation-circle-fill v-if="!scanner.available" />
+              <b-icon-check v-else />
             </span>
             <span>{{ getScannerDisplayName(scanner.name) }}</span>
           </label>
@@ -68,7 +71,7 @@
         {{ scannerError }}
       </b-alert>
       <p
-        v-if="!scannerLoading && availableScanners.length === 0"
+        v-if="!scannerLoading && selectableScanners.length === 0"
         class="mb-0 text-muted"
       >
         No configured scanner plugins are currently available.
@@ -233,6 +236,7 @@ interface Data {
   selectedScannerNames: string[];
   scanners: ScannerAvailability[];
   scannerStatuses: ScannerStatus[];
+  scannerFailures: { [name: string]: string };
   localData: {
     valid: boolean;
     raw_local: string;
@@ -251,6 +255,7 @@ interface ScannerStatus {
   status: string;
   message: string;
   etaMs?: number;
+  error?: string;
 }
 
 export type ScanResponse<T> = AxiosResponse<{
@@ -278,6 +283,7 @@ export default Vue.extend({
       selectedScannerNames: [],
       scanners: [],
       scannerStatuses: [],
+      scannerFailures: {},
       localData: {
         valid: false,
         raw_local: "",
@@ -332,8 +338,21 @@ export default Vue.extend({
         return true;
       });
     },
-    availableScanners(): ScannerAvailability[] {
-      return this.scannerAvailability.filter((scanner) => scanner.available);
+    selectableScanners(): ScannerAvailability[] {
+      // Show every configured scanner. A scanner is unavailable if the dryrun
+      // probe failed, OR if a previous real run surfaced an error (credentials
+      // / exception we couldn't know until it actually ran). Group the ones
+      // that can't run last so they read as disabled extras.
+      const decorated = this.scannerAvailability.map((scanner) => {
+        const runError = this.scannerFailures[scanner.name];
+        if (scanner.available && runError) {
+          return { ...scanner, available: false, error: runError };
+        }
+        return scanner;
+      });
+      const available = decorated.filter((s) => s.available);
+      const unavailable = decorated.filter((s) => !s.available);
+      return [...available, ...unavailable];
     },
     activeScannerCount(): number {
       return this.scannerStatuses.filter((item) => item.status === "running")
@@ -349,6 +368,14 @@ export default Vue.extend({
     getScannerDisplayName,
     getScannerDescription,
     getScannerRunOptions,
+    scannerToggleTitle(scanner: ScannerAvailability): string {
+      if (!scanner.available) {
+        return scanner.error
+          ? `Unavailable — ${scanner.error}`
+          : "Unavailable — this scanner can't run (missing credentials or configuration).";
+      }
+      return getScannerDescription(scanner.name);
+    },
     clearData() {
       this.isLookup = false;
       this.showInformations = false;
@@ -360,6 +387,9 @@ export default Vue.extend({
     async loadScannerAvailability(): Promise<void> {
       this.scannerLoading = true;
       this.scannerError = "";
+      // Re-probing (mount, or after credentials/preferences change) clears any
+      // remembered run failures so a fixed scanner can recover.
+      this.scannerFailures = {};
       try {
         this.scannerAvailability = await getScannerAvailability();
         this.selectedScannerNames = getDefaultScannerNames(
@@ -415,7 +445,9 @@ export default Vue.extend({
 
         this.scanners = this.scannerAvailability.filter(
           (scanner) =>
-            scanner.available && this.selectedScannerNames.includes(scanner.name)
+            scanner.available &&
+            !this.scannerFailures[scanner.name] &&
+            this.selectedScannerNames.includes(scanner.name)
         );
         this.scannerStatuses = this.scanners.map((scanner) => ({
           scanId: scanner.name,
@@ -435,6 +467,23 @@ export default Vue.extend({
         this.$set(this.scannerStatuses, index, status);
       } else {
         this.scannerStatuses.push(status);
+      }
+
+      // Remember scanners that fail a real run so the selection panel can
+      // disable them with the specific failure message. A later success clears
+      // the record (e.g. a retry succeeded).
+      if (status.status === "error") {
+        this.scannerFailures = {
+          ...this.scannerFailures,
+          [status.scanId]: status.error || status.message,
+        };
+      } else if (
+        status.status === "complete" &&
+        this.scannerFailures[status.scanId]
+      ) {
+        const rest = { ...this.scannerFailures };
+        delete rest[status.scanId];
+        this.scannerFailures = rest;
       }
     },
     cancelRunningScanners(): void {
@@ -549,7 +598,7 @@ export default Vue.extend({
 }
 
 .scanner-toggle:hover {
-  border-color: var(--accent-dim);
+  border-color: var(--accent);
 }
 
 .scanner-toggle input {
@@ -570,11 +619,11 @@ export default Vue.extend({
   width: 1rem;
 }
 
-/* Selected scanner — the same quiet recessed well, with the border lit to a
-   de-energised trace (accent-dim), not the full-bright phosphor. */
+/* Selected scanner — keeps the exact same border as the phone-number field and
+   Lookup button (--rule at rest, --accent on hover from the base rules); the
+   selected state is conveyed by the checkbox tick, not a special border. */
 .scanner-toggle-active {
-  background: color-mix(in oklch, var(--bg) 50%, var(--surface-1));
-  border-color: var(--accent-dim);
+  background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
   color: var(--ink);
 }
 
@@ -585,6 +634,22 @@ export default Vue.extend({
   background: color-mix(in oklch, var(--bg) 60%, var(--surface-1));
   border-color: var(--rule);
   color: var(--accent-dim);
+}
+
+/* A scanner that can't run (no credentials / dryrun failure): disabled, with an
+   error-tinted border and a muted label. The tooltip carries the failure message. */
+.scanner-toggle-error,
+.scanner-toggle-error:hover {
+  background: color-mix(in oklch, var(--led-down) 8%, var(--surface-1));
+  border-color: color-mix(in oklch, var(--led-down) 60%, transparent);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.scanner-toggle-error .scanner-toggle-check {
+  background: transparent;
+  border-color: color-mix(in oklch, var(--led-down) 55%, transparent);
+  color: var(--led-down);
 }
 
 .metadata-grid {
