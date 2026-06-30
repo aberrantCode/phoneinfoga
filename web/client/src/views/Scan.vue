@@ -483,7 +483,7 @@ export default Vue.extend({
   align-items: center;
   background: transparent;
   border: 0;
-  color: #212529;
+  color: var(--ink);
   display: inline-flex;
   font-size: 1.15rem;
   font-weight: 600;
@@ -508,7 +508,7 @@ export default Vue.extend({
 }
 
 .scanner-selector-label {
-  color: #495057;
+  color: var(--ink-soft);
   font-weight: 600;
 }
 
@@ -520,8 +520,10 @@ export default Vue.extend({
 
 .scanner-toggle {
   align-items: center;
-  border: 1px solid #ced4da;
-  border-radius: 0.25rem;
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  border-radius: var(--ac-radius-md);
+  color: var(--ink);
   cursor: pointer;
   display: inline-flex;
   font-weight: 500;
@@ -531,8 +533,13 @@ export default Vue.extend({
   min-height: 2rem;
   padding: 0.4rem 0.6rem;
   transition: background-color 0.12s ease, border-color 0.12s ease,
-    color 0.12s ease;
+    color 0.12s ease, box-shadow 0.12s ease;
   user-select: none;
+}
+
+.scanner-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .scanner-toggle input {
@@ -544,7 +551,7 @@ export default Vue.extend({
 
 .scanner-toggle-check {
   align-items: center;
-  border: 1px solid #adb5bd;
+  border: 1px solid var(--rule);
   border-radius: 0.2rem;
   color: transparent;
   display: inline-flex;
@@ -553,16 +560,18 @@ export default Vue.extend({
   width: 1rem;
 }
 
+/* Selected scanner = a powered phosphor trace (same language as .ac-tool). */
 .scanner-toggle-active {
-  background: #f1f5ff;
-  border-color: #4f7df3;
-  color: #1f376f;
+  background: color-mix(in oklch, var(--accent) 10%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px -3px var(--accent-glow);
+  color: var(--accent);
 }
 
 .scanner-toggle-active .scanner-toggle-check {
-  background: #4f7df3;
-  border-color: #4f7df3;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
 }
 
 .metadata-grid {
@@ -572,7 +581,7 @@ export default Vue.extend({
 }
 
 .metadata-item {
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--rule-soft);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -580,9 +589,10 @@ export default Vue.extend({
 }
 
 .metadata-label {
-  color: #6c757d;
+  color: var(--muted);
   font-size: 0.8rem;
   font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
