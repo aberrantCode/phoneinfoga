@@ -46,6 +46,45 @@ describe("Scanner.vue", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  describe("runScan lookupId threading", () => {
+    const runBodyOf = (): Record<string, unknown> | undefined => {
+      const call = mockedAxios.post.mock.calls.find((c) =>
+        String(c[0]).endsWith("/run")
+      );
+      return call?.[1] as Record<string, unknown> | undefined;
+    };
+
+    const prepareRun = (): void => {
+      // Auto-mocked CancelToken.source() returns undefined; give runScan a usable source.
+      (mockedAxios.CancelToken as any).source = jest.fn(() => ({
+        token: "cancel-token",
+        cancel: jest.fn(),
+      }));
+      mockedAxios.post.mockReset();
+      mockedAxios.post.mockResolvedValue({ data: { result: {} } } as never);
+    };
+
+    it("includes lookupId in the run body when the prop is set", async () => {
+      const wrapper = mountScanner({ lookupId: "lk-123" });
+      await wrapper.vm.$nextTick();
+      prepareRun();
+
+      await (wrapper.vm as any).runScan();
+
+      expect(runBodyOf()).toMatchObject({ lookupId: "lk-123" });
+    });
+
+    it("omits lookupId when the prop is absent (backward compatible)", async () => {
+      const wrapper = mountScanner();
+      await wrapper.vm.$nextTick();
+      prepareRun();
+
+      await (wrapper.vm as any).runScan();
+
+      expect(runBodyOf()).not.toHaveProperty("lookupId");
+    });
+  });
+
   describe("errorText", () => {
     it("returns a string error verbatim", () => {
       const wrapper = mountScanner();

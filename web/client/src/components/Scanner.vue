@@ -296,6 +296,9 @@ export default class Scanner extends Vue {
   @Prop({ default: true }) autoExpandOnData!: boolean;
   @Prop({ default: () => ({}) }) scanOptions!: { [key: string]: number };
   @Prop({ default: () => ({}) }) metadata!: LocalMetadata;
+  // When set, the scan result is persisted against this lookup record. Empty (the default)
+  // keeps the original request body and behavior unchanged.
+  @Prop({ default: "" }) lookupId!: string;
 
   get collapseId(): string {
     return `scanner-collapse-${this.scanId}`;
@@ -692,12 +695,21 @@ export default class Scanner extends Vue {
       this.remainingEtaMs()
     );
     try {
+      const body: {
+        number: string;
+        options: { [key: string]: number };
+        lookupId?: string;
+      } = {
+        number: this.$store.state.number,
+        options: this.scanOptions,
+      };
+      if (this.lookupId) {
+        body.lookupId = this.lookupId;
+      }
+
       const res = await axios.post(
         `${config.apiUrl}/v2/scanners/${this.scanId}/run`,
-        {
-          number: this.$store.state.number,
-          options: this.scanOptions,
-        },
+        body,
         {
           cancelToken: this.cancelSource.token,
           validateStatus: () => true,

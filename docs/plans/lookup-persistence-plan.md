@@ -161,8 +161,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   Typed client + `LookupDetail`/`LookupSummary`/etc. interfaces. `getLatestLookup` uses
   `validateStatus` to return `null` on 404 (for the replay-vs-fresh branch in 7.1). 6 Jest
   tests (axios mocked). Lint clean, `yarn build` + full 64-test suite green.
-- [ ] **5.2** `feat` Thread optional `lookupId` through the existing per-scanner `run`
+- [x] **5.2** `feat` Thread optional `lookupId` through the existing per-scanner `run`
   call (Scanner.vue / utils) without changing behavior when absent.
+  Added `@Prop lookupId` (default `""`) to `Scanner.vue`; `runScan` adds `lookupId` to the POST
+  body only when non-empty (request identical to today when absent — AC13). Scanner.spec tests
+  both branches (stubbing `CancelToken.source`). Lint + 66-test suite + build green.
 - [ ] **5.3** `feat` Introduce a `viewState` model in `Scan.vue`
   (`entry | results`, source `fresh | replay`, `activeLookup`).
 - **Gate:** `yarn build` (in `web/client`) succeeds; existing UI still works.
