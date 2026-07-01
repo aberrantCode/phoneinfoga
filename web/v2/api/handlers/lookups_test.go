@@ -255,3 +255,63 @@ func TestGetLatestLookupHandlerWithoutStore(t *testing.T) {
 	resp := handlers.GetLatestLookup(newGetContext(t, "/v2/lookups/latest?number=14152229670"))
 	assert.Equal(t, http.StatusInternalServerError, resp.Code)
 }
+
+// seedLookupFor seeds a lookup for an explicit e164/input pair.
+func seedLookupFor(t *testing.T, s *store.SQLiteStore, e164, input string) store.Lookup {
+	t.Helper()
+	l, err := s.CreateLookup(context.Background(), store.Lookup{
+		E164: e164, NumberInput: input, Valid: true, ScannersRequested: []string{"local"},
+	})
+	require.NoError(t, err)
+	return l
+}
+
+func TestListLookupsHandlerOrderingAndLimit(t *testing.T) {
+	s := newLookupTestStore(t)
+	var ids []string
+	for i := 0; i < 3; i++ {
+		ids = append(ids, seedLookup(t, s, "local").ID)
+		time.Sleep(2 * time.Millisecond)
+	}
+
+	ctx := newGetContext(t, "/v2/lookups?number=14152229670&limit=2")
+	resp := handlers.ListLookups(ctx)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	data, ok := resp.Data.(handlers.ListLookupsResponse)
+	require.True(t, ok, "unexpected response type %T", resp.Data)
+	require.Len(t, data.Lookups, 2, "limit should cap results")
+	// Newest first.
+	assert.Equal(t, ids[2], data.Lookups[0].ID)
+	assert.Equal(t, ids[1], data.Lookups[1].ID)
+	assert.Equal(t, store.StatusPending, data.Lookups[0].Status)
+}
+
+func TestListLookupsHandlerScopedToNumber(t *testing.T) {
+	s := newLookupTestStore(t)
+	seedLookup(t, s, "local")                            // numberA (+14152229670)
+	seedLookup(t, s, "local")                            // numberA
+	seedLookupFor(t, s, "+447700900123", "447700900123") // a different number
+
+	ctx := newGetContext(t, "/v2/lookups?number=14152229670")
+	resp := handlers.ListLookups(ctx)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	data := resp.Data.(handlers.ListLookupsResponse)
+	require.Len(t, data.Lookups, 2, "must return only the queried number's lookups (AC10)")
+	for _, l := range data.Lookups {
+		assert.Equal(t, "+14152229670", l.E164)
+	}
+}
+
+func TestListLookupsHandlerMissingNumber(t *testing.T) {
+	newLookupTestStore(t)
+	resp := handlers.ListLookups(newGetContext(t, "/v2/lookups"))
+	assert.Equal(t, http.StatusBadRequest, resp.Code)
+}
+
+func TestListLookupsHandlerWithoutStore(t *testing.T) {
+	handlers.InitStore(nil)
+	resp := handlers.ListLookups(newGetContext(t, "/v2/lookups?number=14152229670"))
+	assert.Equal(t, http.StatusInternalServerError, resp.Code)
+}

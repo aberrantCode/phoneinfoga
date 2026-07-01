@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -283,5 +284,81 @@ func GetLatestLookup(ctx *gin.Context) *api.Response {
 		Code: http.StatusOK,
 		JSON: true,
 		Data: lookupDetail(*l),
+	}
+}
+
+// LookupSummary is a per-number history entry (no scanner results).
+type LookupSummary struct {
+	ID                string     `json:"id"`
+	E164              string     `json:"e164"`
+	Status            string     `json:"status"`
+	ScannersRequested []string   `json:"scannersRequested"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	CompletedAt       *time.Time `json:"completedAt"`
+}
+
+// ListLookupsResponse wraps a number's lookup summaries, newest first.
+type ListLookupsResponse struct {
+	Lookups []LookupSummary `json:"lookups"`
+}
+
+// listLimit parses the optional `limit` query parameter; a missing or invalid value
+// yields 0, which the store interprets as its default.
+func listLimit(ctx *gin.Context) int {
+	if v := ctx.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return 0
+}
+
+// ListLookups is an HTTP handler
+// @ID ListLookups
+// @Tags Lookups
+// @Summary List a number's lookups
+// @Description Returns per-number lookup summaries, newest first. Requires the number query parameter and never returns other numbers.
+// @Produce  json
+// @Success 200 {object} ListLookupsResponse
+// @Success 400 {object} api.ErrorResponse
+// @Success 500 {object} api.ErrorResponse
+// @Router /v2/lookups [get]
+// @Param number query string true "Phone number"
+// @Param limit query int false "Maximum number of lookups to return"
+func ListLookups(ctx *gin.Context) *api.Response {
+	if Store == nil {
+		return storeUnavailable()
+	}
+
+	e164, errResp := e164FromQuery(ctx)
+	if errResp != nil {
+		return errResp
+	}
+
+	lookups, err := Store.ListLookupsByNumber(ctx.Request.Context(), e164, listLimit(ctx))
+	if err != nil {
+		return &api.Response{
+			Code: http.StatusInternalServerError,
+			JSON: true,
+			Data: api.ErrorResponse{Error: err.Error()},
+		}
+	}
+
+	summaries := make([]LookupSummary, 0, len(lookups))
+	for _, l := range lookups {
+		summaries = append(summaries, LookupSummary{
+			ID:                l.ID,
+			E164:              l.E164,
+			Status:            l.Status,
+			ScannersRequested: l.ScannersRequested,
+			CreatedAt:         l.CreatedAt,
+			CompletedAt:       l.CompletedAt,
+		})
+	}
+
+	return &api.Response{
+		Code: http.StatusOK,
+		JSON: true,
+		Data: ListLookupsResponse{Lookups: summaries},
 	}
 }

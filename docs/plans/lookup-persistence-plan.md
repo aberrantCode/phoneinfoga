@@ -113,8 +113,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `GetLatestLookup` handler + shared `e164FromQuery` (normalizes via `number.NewNumber`, 400 on
   missing/invalid). Reuses `lookupDetail`. Tests: newest returned, missing/invalid number → 400,
   none → 404, nil store → 500. Route in 3.6. Pkg coverage 94.2%.
-- [ ] **3.5** `feat` `GET /v2/lookups?number=&limit=` → per-number summaries newest-first;
+- [x] **3.5** `feat` `GET /v2/lookups?number=&limit=` → per-number summaries newest-first;
   `400` if `number` missing; never returns other numbers.
+  `ListLookups` handler + `LookupSummary`/`ListLookupsResponse` (no results); `listLimit` parses
+  optional `limit` (0 → store default). Tests: ordering+limit, AC10 number-scoping, missing
+  number → 400, nil store → 500. Route in 3.6. Pkg coverage 94.1%.
 - [ ] **3.6** `feat` Register all five routes in `web/v2/api/server/server.go`.
 - [ ] **3.7** `test` `lookups_test.go` (`httptest` + injected in-memory store): happy paths,
   `400` on missing number, `404`s, and **AC10** (no cross-number leakage).
