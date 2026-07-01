@@ -42,8 +42,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   (no new dependency) + a unit test asserting format/uniqueness.
   `NewUUID()` sets RFC 4122 version/variant bits; tests assert canonical v4 regex + 1000
   unique ids. Package coverage 83.3%.
-- [ ] **1.3** `feat` Add migration `web/v2/api/store/migrations/0001_init.sql` (both
+- [x] **1.3** `feat` Add migration `web/v2/api/store/migrations/0001_init.sql` (both
   tables + indexes per spec §5). Embed via `embed.FS`.
+  `migrations.go` embeds `migrations/*.sql`; test applies the SQL to an in-memory DB and
+  asserts both tables + all three indexes exist. Removed the now-redundant `.gitkeep`.
 - [ ] **1.4** `test` Write `store_test.go` (RED): open temp-file DB → `Migrate` →
   `CreateLookup` → `SaveScannerResult` (success + error rows) → `CloseLookup` →
   `GetLookup`/`GetLatestLookupByNumber`/`ListLookupsByNumber`. Assert ordering,

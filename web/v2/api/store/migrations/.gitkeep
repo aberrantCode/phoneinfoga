@@ -1,2 +1,0 @@
-# Placeholder so git tracks this directory. The embedded SQL migrations
-# (0001_init.sql, ...) are added in a later task and served via embed.FS.
