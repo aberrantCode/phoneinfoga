@@ -80,9 +80,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   Extracted testable `resolveDBPath`/`setupStore` (`cmd/serve_store.go`); PreRun calls
   `exitWithError` on failure. Smoke-verified: `serve` boots, creates the DB (+parent dir,
   WAL files), `user_version=1`, both tables present. Automated assertion follows in 2.3.
-- [ ] **2.3** `test` Add a serve-wiring test (or extend existing) asserting `handlers.Store`
+- [x] **2.3** `test` Add a serve-wiring test (or extend existing) asserting `handlers.Store`
   is non-nil after init with a temp path.
-- **Gate:** `phoneinfoga serve` boots, creates the DB file, and migrates cleanly.
+  `cmd/serve_store_test.go`: `setupStore(temp)` injects a non-nil `handlers.Store` and creates
+  the DB file (+parent dir); default/env path resolution; open-error path. New-code coverage
+  `resolveDBPath` 100%, `setupStore` 87.5%.
+- **Gate:** ✅ `phoneinfoga serve` boots, creates the DB file, and migrates cleanly (live smoke
+  test in 2.2 + automated `setupStore` test in 2.3).
 
 ## Phase 3 — Lookup lifecycle + read API (TDD)
 
