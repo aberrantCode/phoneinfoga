@@ -46,11 +46,15 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   tables + indexes per spec §5). Embed via `embed.FS`.
   `migrations.go` embeds `migrations/*.sql`; test applies the SQL to an in-memory DB and
   asserts both tables + all three indexes exist. Removed the now-redundant `.gitkeep`.
-- [ ] **1.4** `test` Write `store_test.go` (RED): open temp-file DB → `Migrate` →
+- [x] **1.4** `test` Write `store_test.go` (RED): open temp-file DB → `Migrate` →
   `CreateLookup` → `SaveScannerResult` (success + error rows) → `CloseLookup` →
   `GetLookup`/`GetLatestLookupByNumber`/`ListLookupsByNumber`. Assert ordering,
   hydration, cascade delete, upsert on duplicate `(lookup_id, scanner)`, and
   `Migrate` idempotency.
+  RED as intended — references `New`/`*SQLiteStore` (undefined until 1.5). Contract: store
+  assigns id/created_at/status=pending; results ordered by started_at; complete vs partial
+  close; latest/list newest-first with limit + number scoping; FK cascade. Non-test build
+  stays green; store package test compiles GREEN in 1.5.
 - [ ] **1.5** `feat` Implement `web/v2/api/store/sqlite.go` (`sqliteStore`) to GREEN:
   `sql.Open("sqlite", path)`, WAL/busy_timeout/foreign_keys PRAGMAs, `os.MkdirAll`
   on parent dir, embedded migration runner via `PRAGMA user_version`.
