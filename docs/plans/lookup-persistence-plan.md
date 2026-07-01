@@ -139,9 +139,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   raw row, scanner error persists an error row (response still 500, unchanged), and no
   `lookupId` persists nothing. Intentionally RED — references `RunScannerInput.LookupID`
   (added in 4.2). Non-test build stays green.
-- [ ] **4.2** `feat` Add optional `LookupId` to `RunScannerInput`; in `RunScanner`, time the
+- [x] **4.2** `feat` Add optional `LookupId` to `RunScannerInput`; in `RunScanner`, time the
   run and — when `lookupId` present — `SaveScannerResult` (raw verbatim, status/message,
   timing). Persist errors too.
+  `RunScannerInput.LookupID` (`json:"lookupId"`); `persistScannerResult` helper (best-effort,
+  guarded on nil store / empty id). Times around `scanner.Run`; success persists
+  `json.Marshal(result)` verbatim, error persists status+message. RED suite GREEN; existing
+  RunScanner tests unchanged (AC13). `RunScanner`/`persistScannerResult` 100% coverage.
 - [ ] **4.3** `feat` Make persistence non-fatal: on store error, log warn and still return
   the scan result (spec §7).
 - **Gate:** `go test ./web/v2/api/...` green; AC1–AC3, AC13 covered.

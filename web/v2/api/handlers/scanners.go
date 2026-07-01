@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"encoding/json"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sundowndev/phoneinfoga/v2/lib/number"
 	"github.com/sundowndev/phoneinfoga/v2/lib/remote"
 	"github.com/sundowndev/phoneinfoga/v2/web/v2/api"
-	"net/http"
+	"github.com/sundowndev/phoneinfoga/v2/web/v2/api/store"
 )
 
 type Scanner struct {
@@ -122,6 +126,28 @@ func DryRunScanner(ctx *gin.Context) *api.Response {
 type RunScannerInput struct {
 	Number  string                `json:"number" binding:"number,required"`
 	Options remote.ScannerOptions `json:"options" validate:"dive,required"`
+	// LookupID, when set, attaches this scan's result to a lookup record (spec §4). Absent
+	// (the CLI and callers that don't persist) keeps the endpoint's original behavior.
+	LookupID string `json:"lookupId"`
+}
+
+// persistScannerResult best-effort persists a scanner result when a lookupId is supplied and
+// a store is configured. Persistence must never affect the /run response (spec §7); the store
+// error is intentionally swallowed here and surfaced as a warning in task 4.3.
+func persistScannerResult(ctx *gin.Context, lookupID, scanner, status, errMessage string, raw json.RawMessage, startedAt, finishedAt time.Time) {
+	if Store == nil || lookupID == "" {
+		return
+	}
+	_ = Store.SaveScannerResult(ctx.Request.Context(), store.ScannerResult{
+		LookupID:     lookupID,
+		Scanner:      scanner,
+		Status:       status,
+		ErrorMessage: errMessage,
+		RawResponse:  raw,
+		StartedAt:    startedAt,
+		FinishedAt:   finishedAt,
+		DurationMs:   finishedAt.Sub(startedAt).Milliseconds(),
+	})
 }
 
 type RunScannerResponse struct {
@@ -173,14 +199,27 @@ func RunScanner(ctx *gin.Context) *api.Response {
 		}
 	}
 
+	startedAt := time.Now().UTC()
 	result, err := scanner.Run(*num, input.Options)
+	finishedAt := time.Now().UTC()
+
 	if err != nil {
+		persistScannerResult(ctx, input.LookupID, scanner.Name(), store.ResultStatusError,
+			err.Error(), nil, startedAt, finishedAt)
 		return &api.Response{
 			Code: http.StatusInternalServerError,
 			JSON: true,
 			Data: api.ErrorResponse{Error: err.Error()},
 		}
 	}
+
+	// Persist the scanner's exact payload verbatim (same marshaling as the live response).
+	var raw json.RawMessage
+	if b, mErr := json.Marshal(result); mErr == nil {
+		raw = b
+	}
+	persistScannerResult(ctx, input.LookupID, scanner.Name(), store.ResultStatusSuccess,
+		"", raw, startedAt, finishedAt)
 
 	return &api.Response{
 		Code: http.StatusOK,
