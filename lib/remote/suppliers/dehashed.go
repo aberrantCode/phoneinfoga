@@ -1,10 +1,10 @@
 package suppliers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -48,32 +48,59 @@ type DehashedSupplier struct {
 	BaseURL string
 }
 
-// dehashedDefaultBaseURL targets the documented v1 search endpoint, which uses
-// HTTP Basic auth (email:api_key). Dehashed also offers a v2 API
-// (POST https://api.dehashed.com/v2/search with a "Dehashed-Api-Key" header).
-// If your account uses v2, override DEHASHED_API_URL and adjust the request
-// construction in SearchByPhone accordingly — the response envelope is modeled
-// to tolerate either version's field shapes.
-const dehashedDefaultBaseURL = "https://api.dehashed.com/search"
+// dehashedDefaultBaseURL targets the Dehashed v2 search endpoint. v2 replaced
+// the retired v1 "GET /search" endpoint (which used HTTP Basic email:api_key
+// auth) — v1 now returns HTTP 404. v2 takes a JSON POST body and authenticates
+// with the "DeHashed-Api-Key" header. DehashedEntry fields are modeled as
+// json.RawMessage so v2's array-shaped values decode without change.
+const dehashedDefaultBaseURL = "https://api.dehashed.com/v2/search"
+
+// dehashedDefaultPageSize bounds a single lookup. v2 accepts 1..10000; a phone
+// number rarely maps to many records, so a modest first page is sufficient.
+const dehashedDefaultPageSize = 100
+
+// dehashedSearchRequest is the v2 POST body. The boolean toggles are sent
+// explicitly (all false) to match the documented request shape.
+type dehashedSearchRequest struct {
+	Query    string `json:"query"`
+	Page     int    `json:"page"`
+	Size     int    `json:"size"`
+	Wildcard bool   `json:"wildcard"`
+	Regex    bool   `json:"regex"`
+	DeDupe   bool   `json:"de_dupe"`
+}
 
 func NewDehashedSupplier() *DehashedSupplier {
 	return &DehashedSupplier{BaseURL: dehashedDefaultBaseURL}
 }
 
 func (s *DehashedSupplier) SearchByPhone(email, apiKey, query string) (*DehashedResponse, error) {
+	// v2 authenticates with the DeHashed-Api-Key header alone. email is retained
+	// in the signature (and the scanner's credential gate) for backward-
+	// compatible configuration but is no longer part of the request.
+	_ = email
+
 	// Intentionally logs only the query, never the credentials or any returned
 	// records.
 	logrus.
 		WithField("query", query).
-		Debug("Running breach lookup through Dehashed API")
+		Debug("Running breach lookup through Dehashed v2 API")
 
-	endpoint := fmt.Sprintf("%s?query=%s", s.BaseURL, url.QueryEscape(query))
-
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	payload, err := json.Marshal(dehashedSearchRequest{
+		Query: query,
+		Page:  1,
+		Size:  dehashedDefaultPageSize,
+	})
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth(email, apiKey)
+
+	req, err := http.NewRequest(http.MethodPost, s.BaseURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("DeHashed-Api-Key", apiKey)
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 20 * time.Second}
@@ -84,7 +111,7 @@ func (s *DehashedSupplier) SearchByPhone(email, apiKey, query string) (*Dehashed
 	defer response.Body.Close()
 
 	if response.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("dehashed authentication failed (HTTP 401): check DEHASHED_EMAIL and DEHASHED_API_KEY")
+		return nil, fmt.Errorf("dehashed authentication failed (HTTP 401): check DEHASHED_API_KEY")
 	}
 	if response.StatusCode == http.StatusTooManyRequests {
 		return nil, fmt.Errorf("dehashed rate limit exceeded (HTTP 429)")

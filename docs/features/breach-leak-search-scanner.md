@@ -60,10 +60,16 @@ Designed around a provider that exposes an authenticated search API keyed by pho
 number (Dehashed is the reference implementation):
 
 ```
-GET https://api.dehashed.com/search?query=phone:{E164}
-Authorization: Basic base64(account_email:api_key)
-Accept: application/json
+POST https://api.dehashed.com/v2/search
+DeHashed-Api-Key: {api_key}
+Content-Type: application/json
+
+{"query": "phone:{E164}", "page": 1, "size": 100}
 ```
+
+> The retired v1 endpoint (`GET /search` with HTTP Basic `email:api_key` auth)
+> now returns HTTP 404. v2 authenticates with the `DeHashed-Api-Key` header
+> alone and returns entry field values as arrays.
 
 **Default fields consumed (minimal mode):**
 
