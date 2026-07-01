@@ -1,6 +1,12 @@
 <template>
   <div>
-    <b-form @submit="onSubmit" class="d-flex justify-content-center mt-5">
+    <!-- Entry state: phone-number field, country selector and Lookup button. In the
+         results state these are hidden and replaced by the Start over control (AC6). -->
+    <b-form
+      v-if="!isResultsState"
+      @submit="onSubmit"
+      class="d-flex justify-content-center mt-5"
+    >
       <b-form-group id="input-group-1" label-for="input-1">
         <b-input-group>
           <VuePhoneNumberInput
@@ -30,6 +36,15 @@
         </b-input-group>
       </b-form-group>
     </b-form>
+
+    <div
+      v-if="isResultsState"
+      class="results-controls d-flex justify-content-center mt-5"
+    >
+      <b-button variant="outline-secondary" size="sm" @click="startOver">
+        Start over
+      </b-button>
+    </div>
 
     <div v-if="!isLookup && inputNumberValid" class="scanner-selector">
       <div class="scanner-selector-toolbar">
@@ -476,6 +491,14 @@ export default Vue.extend({
     },
     enterEntry(): void {
       this.viewState = { state: "entry", source: "fresh", activeLookup: null };
+    },
+    // startOver resets the whole page back to the entry state and clears the number
+    // field so the user can look up a different number (AC6).
+    startOver(): void {
+      this.clearData();
+      this.inputNumber = "";
+      this.inputNumberVal = "";
+      this.inputNumberValid = false;
     },
     clearData() {
       this.enterEntry();

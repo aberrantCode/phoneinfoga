@@ -175,8 +175,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 6 — Results state, metadata panel, Start over
 
-- [ ] **6.1** `feat` In results state, **hide** the phone-number field, country selector,
+- [x] **6.1** `feat` In results state, **hide** the phone-number field, country selector,
   and Lookup button; render a **Start over** control that resets to entry (AC6).
+  Entry form gated on `!isResultsState`; a **Start over** button (shown when `isResultsState`)
+  calls `startOver()` → `clearData` + clears the input fields. Non-breaking (nothing enters
+  results state until 6.3). Scan.spec asserts input hidden in results + Start over resets.
 - [ ] **6.2** `feat` Extend the metadata panel to show request/results record: lookup time,
   client IP, scanners requested, overall status (AC5) — alongside existing number metadata.
 - [ ] **6.3** `feat` Fresh-lookup orchestration: `createLookup` → per-scanner runs with

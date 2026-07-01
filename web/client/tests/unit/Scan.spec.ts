@@ -18,6 +18,7 @@ jest.mock("@/utils", () => {
 });
 
 import Scan from "@/views/Scan.vue";
+import VuePhoneNumberInput from "vue-phone-number-input";
 import {
   getScannerAvailability,
   getScannerDescription,
@@ -338,6 +339,36 @@ describe("Scan.vue", () => {
       wrapper.vm.enterResults("fresh");
       wrapper.vm.clearData();
       expect(wrapper.vm.isEntryState).toBe(true);
+    });
+  });
+
+  describe("results-state input hiding (AC6)", () => {
+    it("shows the phone input in entry state and hides it in results state", async () => {
+      const { wrapper } = mountScan();
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(true);
+
+      wrapper.vm.enterResults("fresh");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(false);
+      expect(wrapper.text()).toContain("Start over");
+    });
+
+    it("startOver returns to entry and clears the input field", async () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("fresh");
+      wrapper.vm.inputNumber = "14152229670";
+      wrapper.vm.inputNumberVal = "14152229670";
+      wrapper.vm.inputNumberValid = true;
+
+      wrapper.vm.startOver();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.isEntryState).toBe(true);
+      expect(wrapper.vm.inputNumber).toBe("");
+      expect(wrapper.vm.inputNumberVal).toBe("");
+      expect(wrapper.vm.inputNumberValid).toBe(false);
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(true);
     });
   });
 });
