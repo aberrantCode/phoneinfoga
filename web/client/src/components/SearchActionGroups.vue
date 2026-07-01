@@ -126,14 +126,10 @@
     </div>
 
     <div v-else>
-      <p class="text-muted mb-3">
-        SearXNG checked each search action and returned match counts with top
-        results. Open matching searches, inspect hits inline, or copy a query
-        for adjustment.
-      </p>
+      <p class="text-muted mb-3">{{ resultsIntro }}</p>
 
       <b-card
-        v-for="group in searxngGroups"
+        v-for="group in resultsGroups"
         :key="group.key"
         no-body
         class="search-action-group"
@@ -165,7 +161,10 @@
               </h4>
               <p class="text-muted mb-0">{{ group.description }}</p>
             </div>
-            <div class="d-flex align-items-center mt-2 mt-sm-0">
+            <div
+              v-if="supportsLauncher"
+              class="d-flex align-items-center mt-2 mt-sm-0"
+            >
               <b-badge v-if="launcherRunning" variant="info" class="mr-2">
                 {{ launcherRemaining }} queued
               </b-badge>
@@ -204,6 +203,13 @@
             >
               <template #cell(dork)="row">
                 <code class="search-query">{{ row.item.dork }}</code>
+                <b-badge
+                  v-if="row.item.engine"
+                  variant="light"
+                  class="ml-2 search-engine-badge"
+                >
+                  {{ row.item.engine }}
+                </b-badge>
                 <p v-if="row.item.error" class="text-danger small mb-0 mt-2">
                   {{ row.item.error }}
                 </p>
@@ -231,6 +237,7 @@
               </template>
               <template #cell(actions)="row">
                 <b-button
+                  v-if="row.item.url"
                   :id="actionButtonId('searxng-open', group.key, row.index)"
                   :href="row.item.url"
                   target="_blank"
@@ -243,6 +250,7 @@
                   <b-icon-box-arrow-up-right aria-hidden="true" />
                 </b-button>
                 <b-tooltip
+                  v-if="row.item.url"
                   :target="actionButtonId('searxng-open', group.key, row.index)"
                 >
                   Open query in SearXNG
@@ -267,6 +275,7 @@
                   Copy query text
                 </b-tooltip>
                 <b-button
+                  v-if="row.item.url"
                   :id="actionButtonId('searxng-copy-url', group.key, row.index)"
                   variant="outline-secondary"
                   size="sm"
@@ -277,6 +286,7 @@
                   <b-icon-link45deg aria-hidden="true" />
                 </b-button>
                 <b-tooltip
+                  v-if="row.item.url"
                   :target="
                     actionButtonId('searxng-copy-url', group.key, row.index)
                   "
@@ -317,10 +327,15 @@ interface GoogleSearchGroup {
   items: GoogleSearchDork[];
 }
 
+// Shared shape for the "results" modes (searxng, serpapi). SearXNG carries a
+// per-query `url` to reopen the search; SerpAPI has none (results are already
+// fetched) but carries the `engine` that produced them. url-dependent controls
+// are rendered conditionally so the same layout serves both.
 interface SearXNGQueryResult {
   number: string;
   dork: string;
-  url: string;
+  url?: string;
+  engine?: string;
   result_count: number;
   results?: {
     title?: string;
@@ -362,7 +377,7 @@ interface SearchGroupDefinition {
   },
 })
 export default class SearchActionGroups extends Vue {
-  @Prop({ required: true }) mode!: "google" | "searxng";
+  @Prop({ required: true }) mode!: "google" | "searxng" | "serpapi";
   @Prop({ default: () => ({}) }) data!: GoogleSearchResponse | SearXNGResponse;
   @Prop({ default: "search" }) idPrefix!: string;
 
@@ -427,7 +442,9 @@ export default class SearchActionGroups extends Vue {
       .filter((group) => group.items.length > 0);
   }
 
-  get searxngGroups(): SearXNGGroup[] {
+  // Serves both the searxng and serpapi modes: each returns per-query result
+  // counts and inline hits grouped by investigation intent.
+  get resultsGroups(): SearXNGGroup[] {
     const response = (this.data || {}) as SearXNGResponse;
 
     return this.searchGroupDefinitions
@@ -436,6 +453,19 @@ export default class SearchActionGroups extends Vue {
         items: response[group.key] || [],
       }))
       .filter((group) => group.items.length > 0);
+  }
+
+  get resultsIntro(): string {
+    if (this.mode === "serpapi") {
+      return "SerpApi ran each search action through live search engines and returned match counts with top results. Inspect hits inline or copy a query for adjustment.";
+    }
+    return "SearXNG checked each search action and returned match counts with top results. Open matching searches, inspect hits inline, or copy a query for adjustment.";
+  }
+
+  // Only searxng exposes a per-query search URL, so the batch launcher (Open
+  // Matches / Stop) applies to searxng alone. SerpAPI results are pre-fetched.
+  get supportsLauncher(): boolean {
+    return this.mode === "searxng";
   }
 
   get launcherRemaining(): number {
@@ -451,7 +481,7 @@ export default class SearchActionGroups extends Vue {
   }
 
   get matchedSearXNGQueries(): SearXNGQueryResult[] {
-    return this.searxngGroups.reduce(
+    return this.resultsGroups.reduce(
       (items: SearXNGQueryResult[], group: SearXNGGroup) =>
         items.concat(this.matchedRows(group.items)),
       []
@@ -578,6 +608,11 @@ export default class SearchActionGroups extends Vue {
 .search-query {
   white-space: normal;
   word-break: break-word;
+}
+
+.search-engine-badge {
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 ::v-deep .search-query-column {

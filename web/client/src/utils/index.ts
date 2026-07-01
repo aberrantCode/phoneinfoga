@@ -41,7 +41,6 @@ const getScanners = async (): Promise<ScannerObject[]> => {
 
 const getScannerDisplayName = (name: string): string => {
   const labels: { [key: string]: string } = {
-    googlecse: "Google Custom Search Engine",
     googlesearch: "Google Search",
     numverify: "Numverify",
     searxng: "SearXNG",
@@ -62,8 +61,6 @@ const getScannerDescription = (name: string): string => {
     ovh: "Looks up OVH Telecom's public number ranges (French numbers).",
     googlesearch:
       "Generates ready-to-run Google dork queries (footprints) across social, docs and reputation sites.",
-    googlecse:
-      "Searches a Google Custom Search Engine for pages mentioning the number.",
     searxng:
       "Runs the Google dork footprints through a SearXNG instance and returns matches.",
     hlr: "HLR lookup: live network/roaming status and ported-number detection.",

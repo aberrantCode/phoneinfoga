@@ -19,7 +19,6 @@ func InitScanners(remote *Library) {
 	remote.AddScanner(NewGoogleSearchScanner())
 	remote.AddScanner(NewSearXNGScanner(nil))
 	remote.AddScanner(NewOVHScanner(ovhSupplier))
-	remote.AddScanner(NewGoogleCSEScanner(nil))
 	remote.AddScanner(NewTwilioScanner(twilioSupplier))
 	remote.AddScanner(NewBreachScanner(dehashedSupplier))
 	remote.AddScanner(NewHLRScanner(hlrSupplier))

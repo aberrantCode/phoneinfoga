@@ -118,5 +118,17 @@ describe("Scanner.vue", () => {
         mountScanner({ scanId: "numverify", name: "Numverify" }).vm.displayName
       ).toBe("Numverify");
     });
+
+    it("routes each footprint scanner to the right SearchActionGroups mode", () => {
+      expect(mountScanner({ scanId: "googlesearch" }).vm.searchGroupsMode).toBe(
+        "google"
+      );
+      expect(mountScanner({ scanId: "searxng" }).vm.searchGroupsMode).toBe(
+        "searxng"
+      );
+      const serpapi = mountScanner({ scanId: "serpapi", name: "SerpApi" });
+      expect(serpapi.vm.isSerpApi).toBe(true);
+      expect(serpapi.vm.searchGroupsMode).toBe("serpapi");
+    });
   });
 });
