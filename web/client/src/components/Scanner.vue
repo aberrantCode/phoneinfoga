@@ -246,6 +246,9 @@ export default class Scanner extends Vue {
   @Prop() scanId!: string;
   @Prop() name!: string;
   @Prop({ default: false }) autoRun!: boolean;
+  // Comparison providers surface their fields in the shared matrix, so their
+  // own panel stays collapsed on success instead of auto-expanding.
+  @Prop({ default: true }) autoExpandOnData!: boolean;
   @Prop({ default: () => ({}) }) scanOptions!: { [key: string]: number };
   @Prop({ default: () => ({}) }) metadata!: LocalMetadata;
 
@@ -565,7 +568,10 @@ export default class Scanner extends Vue {
         throw res.data.error;
       }
       this.data = res.data.result;
-      this.expanded = true;
+      this.$emit("result", { scanId: this.scanId, data: this.data });
+      if (this.autoExpandOnData) {
+        this.expanded = true;
+      }
       this.emitStatus(
         "complete",
         this.isGoogleSearch

@@ -110,6 +110,32 @@
       </b-collapse>
     </b-card>
 
+    <b-card v-if="isLookup" no-body class="mb-3">
+      <b-card-header
+        class="bg-white results-section-header"
+        @click="comparisonExpanded = !comparisonExpanded"
+      >
+        <button
+          class="results-section-toggle"
+          type="button"
+          :aria-expanded="comparisonExpanded ? 'true' : 'false'"
+          aria-controls="scan-comparison-collapse"
+          @click.stop="comparisonExpanded = !comparisonExpanded"
+        >
+          <span aria-hidden="true">{{ comparisonExpanded ? "-" : "+" }}</span>
+          <span>Provider comparison</span>
+        </button>
+      </b-card-header>
+      <b-collapse id="scan-comparison-collapse" v-model="comparisonExpanded">
+        <b-card-body>
+          <ProviderComparison
+            :baseline="localData"
+            :results="comparisonResults"
+          />
+        </b-card-body>
+      </b-collapse>
+    </b-card>
+
     <b-card v-if="isLookup" no-body class="mb-3 scan-status-panel">
       <b-card-header
         class="bg-white d-flex align-items-center justify-content-between"
@@ -178,9 +204,11 @@
             :name="getScannerDisplayName(scanner.name)"
             :scanId="scanner.name"
             :autoRun="true"
+            :auto-expand-on-data="!isComparisonProvider(scanner.name)"
             :scan-options="getScannerRunOptions(scanner.name)"
             :metadata="localData"
             @status="updateScannerStatus"
+            @result="captureScannerResult"
           />
         </b-card-body>
       </b-collapse>
@@ -203,8 +231,19 @@ import {
 } from "../utils";
 import VuePhoneNumberInput from "vue-phone-number-input";
 import Scanner from "../components/Scanner.vue";
+import ProviderComparison from "../components/ProviderComparison.vue";
 import axios, { AxiosResponse } from "axios";
 import config from "@/config";
+
+// Scanners whose results share the validation-field vocabulary and therefore
+// belong in the provider-comparison matrix.
+const COMPARISON_PROVIDERS = [
+  "numverify",
+  "veriphone",
+  "numlookupapi",
+  "abstract",
+  "twilio",
+];
 
 interface InputNumberObject {
   countryCallingCode: string;
@@ -228,6 +267,7 @@ interface Data {
   showInformations: boolean;
   informationExpanded: boolean;
   scannersExpanded: boolean;
+  comparisonExpanded: boolean;
   inputNumber: string;
   inputNumberVal: string;
   inputNumberValid: boolean;
@@ -237,6 +277,7 @@ interface Data {
   scanners: ScannerAvailability[];
   scannerStatuses: ScannerStatus[];
   scannerFailures: { [name: string]: string };
+  scannerResults: { [name: string]: unknown };
   localData: {
     valid: boolean;
     raw_local: string;
@@ -265,7 +306,7 @@ export type ScanResponse<T> = AxiosResponse<{
 }>;
 
 export default Vue.extend({
-  components: { Scanner, VuePhoneNumberInput },
+  components: { Scanner, ProviderComparison, VuePhoneNumberInput },
   data(): Data {
     return {
       loading: false,
@@ -275,6 +316,7 @@ export default Vue.extend({
       showInformations: false,
       informationExpanded: true,
       scannersExpanded: true,
+      comparisonExpanded: true,
       inputNumber: "",
       inputNumberVal: "",
       inputNumberValid: false,
@@ -284,6 +326,7 @@ export default Vue.extend({
       scanners: [],
       scannerStatuses: [],
       scannerFailures: {},
+      scannerResults: {},
       localData: {
         valid: false,
         raw_local: "",
@@ -363,11 +406,32 @@ export default Vue.extend({
         ["complete", "canceled", "error"].includes(item.status)
       ).length;
     },
+    comparisonResults(): { [name: string]: unknown } {
+      return COMPARISON_PROVIDERS.reduce(
+        (acc: { [name: string]: unknown }, name) => {
+          if (this.scannerResults[name] !== undefined) {
+            acc[name] = this.scannerResults[name];
+          }
+          return acc;
+        },
+        {}
+      );
+    },
   },
   methods: {
     getScannerDisplayName,
     getScannerDescription,
     getScannerRunOptions,
+    isComparisonProvider(name: string): boolean {
+      return COMPARISON_PROVIDERS.includes(name);
+    },
+    captureScannerResult(payload: { scanId: string; data: unknown }): void {
+      // Immutable update so the comparisonResults computed re-evaluates.
+      this.scannerResults = {
+        ...this.scannerResults,
+        [payload.scanId]: payload.data,
+      };
+    },
     scannerToggleTitle(scanner: ScannerAvailability): string {
       if (!scanner.available) {
         return scanner.error
@@ -381,7 +445,9 @@ export default Vue.extend({
       this.showInformations = false;
       this.informationExpanded = true;
       this.scannersExpanded = true;
+      this.comparisonExpanded = true;
       this.scannerStatuses = [];
+      this.scannerResults = {};
       this.$store.commit("resetState");
     },
     async loadScannerAvailability(): Promise<void> {
