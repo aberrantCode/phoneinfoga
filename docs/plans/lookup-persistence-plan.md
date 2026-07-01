@@ -118,7 +118,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `ListLookups` handler + `LookupSummary`/`ListLookupsResponse` (no results); `listLimit` parses
   optional `limit` (0 → store default). Tests: ordering+limit, AC10 number-scoping, missing
   number → 400, nil store → 500. Route in 3.6. Pkg coverage 94.1%.
-- [ ] **3.6** `feat` Register all five routes in `web/v2/api/server/server.go`.
+- [x] **3.6** `feat` Register all five routes in `web/v2/api/server/server.go`.
+  Registered via `api.WrapHandler`: POST `/v2/lookups`, POST `/v2/lookups/:id/close`, GET
+  `/v2/lookups`, GET `/v2/lookups/latest`, GET `/v2/lookups/:id`. `server_test.go` asserts no
+  panic on the static `latest` vs param `:id` siblings (gin 1.9 radix tree handles it) and that
+  existing routes remain. Backward compat intact.
 - [ ] **3.7** `test` `lookups_test.go` (`httptest` + injected in-memory store): happy paths,
   `400` on missing number, `404`s, and **AC10** (no cross-number leakage).
 - **Gate:** `go test ./web/v2/api/...` green.
