@@ -74,9 +74,12 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `web/v2/api/handlers/init.go` (mirror `RemoteLibrary` pattern).
   `Store store.Store` (nil when unconfigured — CLI/tests); `InitStore` is a plain setter
   (no `sync.Once`) so tests can re-inject. Persistence-aware handlers must nil-check it.
-- [ ] **2.2** `feat` Resolve `PHONEINFOGA_DB_PATH` (default `./phoneinfoga.db`) in
+- [x] **2.2** `feat` Resolve `PHONEINFOGA_DB_PATH` (default `./phoneinfoga.db`) in
   `cmd/serve.go` `PreRun`; open store, `Migrate()`, `handlers.InitStore(store)`;
   `exitWithError` on failure.
+  Extracted testable `resolveDBPath`/`setupStore` (`cmd/serve_store.go`); PreRun calls
+  `exitWithError` on failure. Smoke-verified: `serve` boots, creates the DB (+parent dir,
+  WAL files), `user_version=1`, both tables present. Automated assertion follows in 2.3.
 - [ ] **2.3** `test` Add a serve-wiring test (or extend existing) asserting `handlers.Store`
   is non-nil after init with a temp path.
 - **Gate:** `phoneinfoga serve` boots, creates the DB file, and migrates cleanly.

@@ -59,6 +59,11 @@ func NewServeCmd(opts *ServeCmdOptions) *cobra.Command {
 			f := filter.NewEngine()
 			f.AddRule(opts.DisabledScanners...)
 			handlers.Init(f)
+
+			// Initialize lookup persistence store; fail fast if it can't open/migrate.
+			if err := setupStore(resolveDBPath()); err != nil {
+				exitWithError(err)
+			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if build.IsRelease() && os.Getenv("GIN_MODE") == "" {
