@@ -70,8 +70,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 2 — Config & serve wiring
 
-- [ ] **2.1** `feat` Add `handlers.InitStore(store)` + package var `Store` in
+- [x] **2.1** `feat` Add `handlers.InitStore(store)` + package var `Store` in
   `web/v2/api/handlers/init.go` (mirror `RemoteLibrary` pattern).
+  `Store store.Store` (nil when unconfigured — CLI/tests); `InitStore` is a plain setter
+  (no `sync.Once`) so tests can re-inject. Persistence-aware handlers must nil-check it.
 - [ ] **2.2** `feat` Resolve `PHONEINFOGA_DB_PATH` (default `./phoneinfoga.db`) in
   `cmd/serve.go` `PreRun`; open store, `Migrate()`, `handlers.InitStore(store)`;
   `exitWithError` on failure.
