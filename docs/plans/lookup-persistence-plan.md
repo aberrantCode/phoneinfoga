@@ -132,9 +132,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 4 — Persist scanner results on run
 
-- [ ] **4.1** `test` Extend `scanners_test.go` (RED): `POST /run` with `lookupId` writes a
+- [x] **4.1** `test` Extend `scanners_test.go` (RED): `POST /run` with `lookupId` writes a
   `scanner_results` row (success **and** error cases); **without** `lookupId` writes
   nothing (backward compat, AC13).
+  `run_persist_test.go` (RED) drives `/run` through the router: success persists a verbatim
+  raw row, scanner error persists an error row (response still 500, unchanged), and no
+  `lookupId` persists nothing. Intentionally RED — references `RunScannerInput.LookupID`
+  (added in 4.2). Non-test build stays green.
 - [ ] **4.2** `feat` Add optional `LookupId` to `RunScannerInput`; in `RunScanner`, time the
   run and — when `lookupId` present — `SaveScannerResult` (raw verbatim, status/message,
   timing). Persist errors too.
