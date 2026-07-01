@@ -34,8 +34,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 1 — Store package (TDD)
 
-- [ ] **1.1** `feat` Add `web/v2/api/store/models.go` — `Lookup` and `ScannerResult`
+- [x] **1.1** `feat` Add `web/v2/api/store/models.go` — `Lookup` and `ScannerResult`
   structs (fields per spec §5), `Store` interface (spec §6), status constants.
+  `CompletedAt *time.Time` (nullable), `RawResponse json.RawMessage` (verbatim), status
+  consts `Status*`/`ResultStatus*`. `models_test.go` asserts constant values + hydration.
 - [ ] **1.2** `feat` Add UUIDv4 helper `web/v2/api/store/id.go` using `crypto/rand`
   (no new dependency) + a unit test asserting format/uniqueness.
 - [ ] **1.3** `feat` Add migration `web/v2/api/store/migrations/0001_init.sql` (both
