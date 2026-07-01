@@ -2,73 +2,87 @@
   <img src="./docs/images/banner.png" width=500  alt="project logo"/>
 </p>
 
-<div align="center">
-  <a href="https://github.com/sundowndev/phoneinfoga/actions">
-    <img src="https://github.com/sundowndev/phoneinfoga/workflows/Build/badge.svg" alt="build status" />
-  </a>
-  <a href="https://goreportcard.com/report/github.com/sundowndev/phoneinfoga/v2">
-    <img src="https://goreportcard.com/badge/github.com/sundowndev/phoneinfoga/v2" alt="go report" />
-  </a>
-  <a href="https://codeclimate.com/github/sundowndev/phoneinfoga/maintainability">
-    <img src="https://api.codeclimate.com/v1/badges/3259feb1c68df1cd4f71/maintainability"  alt="code climate badge"/>
-  </a>
-  <a href='https://coveralls.io/github/sundowndev/phoneinfoga'>
-    <img src='https://coveralls.io/repos/github/sundowndev/phoneinfoga/badge.svg' alt='Coverage Status' />
-  </a>
-  <a href="https://github.com/sundowndev/phoneinfoga/releases">
-    <img src="https://img.shields.io/github/release/SundownDEV/phoneinfoga.svg" alt="Latest version" />
-  </a>
-  <a href="https://hub.docker.com/r/sundowndev/phoneinfoga">
-    <img src="https://img.shields.io/docker/pulls/sundowndev/phoneinfoga.svg" alt="Docker pulls" />
-  </a>
-</div>
-
 <h4 align="center">Information gathering framework for phone numbers</h4>
 
 <p align="center">
-  <a href="https://sundowndev.github.io/phoneinfoga/">Documentation</a> •
+  <a href="https://sundowndev.github.io/phoneinfoga/">Upstream docs</a> •
   <a href="https://petstore.swagger.io/?url=https://raw.githubusercontent.com/sundowndev/phoneinfoga/master/web/docs/swagger.yaml">API documentation</a> •
-  <a href="https://medium.com/@SundownDEV/phone-number-scanning-osint-recon-tool-6ad8f0cac27b">Related blog post</a>
+  <a href="./docs/features/">Scanner feature specs</a>
 </p>
+
+> **This is a fork.** It extends [sundowndev/phoneinfoga](https://github.com/sundowndev/phoneinfoga)
+> — which is stable but unmaintained upstream — with **11 additional scanners**, a
+> browser-based credentials/config plane, and a redesigned web client. See
+> [What this fork adds](#what-this-fork-adds) for the full delta. All original
+> credit belongs to [@sundowndev](https://github.com/sundowndev); this fork keeps
+> the same GPL-3.0 license and scanner architecture.
 
 ## About
 
-PhoneInfoga is one of the most advanced tools to scan international phone numbers. It allows you to first gather basic information such as country, area, carrier and line type, then use various techniques to try to find the VoIP provider or identify the owner. It works with a collection of scanners that must be configured in order for the tool to be effective. PhoneInfoga doesn't automate everything, it's just there to help investigating on phone numbers.
+PhoneInfoga is one of the most advanced tools to scan international phone numbers. It gathers basic information such as country, area, carrier and line type, then uses a collection of pluggable **scanners** to enrich a number with OSINT — footprinting, reputation, breach exposure, live network status and more. It doesn't automate everything; it's an investigator's assistant, not a magic "trace a phone" button (see [Anti-features](#anti-features)).
 
-## Current status
+Each scanner is a thin adapter over an external data source, registered in `lib/remote/init.go`. Because scanners compose rather than modify the core engine, this fork adds capabilities purely by registering new ones — and each stays **dormant and skip-clean until you configure its credentials**, so nothing new runs (or fails) unless you opt in.
 
-This project is stable but unmaintained. Upcoming bugs won't be fixed and repository could be archived at any time.
+## What this fork adds
+
+Upstream ships **4** scanners. This fork registers **15**. Everything new is credential-gated and off by default.
+
+### New scanners
+
+| Scanner ID | Category | What it adds | Requires |
+|---|---|---|---|
+| `twilio` | Number intelligence | Twilio Lookup v2 — richer line-type taxonomy, portability-aware carrier, optional CNAM / SIM-swap / call-forwarding | `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` |
+| `hlr` | Live network status | Home Location Register lookup — is the mobile number active/reachable *right now*, serving carrier after porting, roaming (no call/SMS sent). Mobile-only | `HLR_API_KEY` + `HLR_API_URL` |
+| `nanpa` | Range allocation | Resolves +1 (North American) numbers to NPA-NXX rate center, geography and carrier-of-record (OCN) — the NANP equivalent of what `ovh` does for a few EU countries | `NANPA_API_URL` |
+| `ipqualityscore` | Reputation / fraud | Machine-readable fraud score + abuse flags and line signals (VoIP, prepaid, disposable, active) — beyond just generating dork URLs | `IPQS_API_KEY` |
+| `breach` | Breach / leak exposure **(sensitive)** | Whether the number appears in known breaches/leaks and how many records, via an authenticated aggregator (Dehashed). **Double-gated:** must be explicitly enabled *and* have credentials | `BREACH_SCANNER_ENABLED=true` + `DEHASHED_EMAIL` + `DEHASHED_API_KEY` |
+| `serpapi` | Web footprint | Runs the existing phone-number dorks through SerpAPI (Google/Bing/DuckDuckGo/Yandex), returning result counts and top hits | `SERPAPI_KEY` |
+| `googlecse` | Web footprint | Executes dorks via Google Programmable Search (Custom Search Engine) | `GOOGLECSE_CX` + `GOOGLE_API_KEY` |
+| `searxng` | Web footprint | Executes dorks against a self-hosted/instance SearXNG meta-search | `SEARXNG_URL` |
+| `veriphone` | Validation | Numverify-alternative validation for redundancy / cross-checking | `VERIPHONE_API_KEY` |
+| `abstract` | Validation | Abstract Phone Validation as an alternate provider | `ABSTRACT_PHONE_API_KEY` |
+| `numlookupapi` | Validation | NumlookupAPI as an alternate validation provider | `NUMLOOKUPAPI_API_KEY` |
+
+The three validation scanners share one `ValidationProvider` supplier interface — configure only the providers you actually use, and use them to cross-check or fail over when a Numverify quota is exhausted.
+
+### Web client changes
+
+- **Runtime credentials plane** (`web/config_controller.go`): a `GET`/`POST /api/config` endpoint lets you inspect and set scanner credentials in the running process **without a restart or editing `.env`**. It's hardened — **loopback-only**, requires a JSON content-type (defeats simple-request CSRF), writes are restricted to an allowlist, and secret values are returned masked (last 4 chars) and never in full.
+- **Scanner credentials modal** (`ScannerCredentials.vue`) to drive that endpoint from the browser.
+- **Scanner panel gating**: the panel stays hidden until a valid number is entered, and scanners that can't run surface as **disabled toggles with a failure reason**, so it's obvious *why* a scanner is unavailable.
+- **"PCB phosphor console" theme** — a redesigned masthead, scanner toggles and footer.
 
 ## Features
 
-- Check if phone number exists
-- Gather basic information such as country, line type and carrier
-- OSINT footprinting using external APIs, phone books & search engines
-- Check for reputation reports, social media, disposable numbers and more
-- Use the graphical user interface to run scans from the browser
-- Programmatic usage with the [REST API](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/sundowndev/phoneinfoga/master/web/docs/swagger.yaml) and [Go modules](https://pkg.go.dev/github.com/sundowndev/phoneinfoga/v2)
+- Check if a phone number exists and gather basics: country, line type, carrier
+- OSINT footprinting via external APIs, phone books and multiple search backends (SerpAPI, Google CSE, SearXNG, Google search dorks)
+- Live network intelligence: Twilio Lookup v2 and HLR status
+- Reputation / fraud scoring and **breach-exposure** checks
+- Range/rate-center allocation for +1 (NANPA) and select EU countries (OVH)
+- Redundant validation across Numverify, Veriphone, Abstract and NumlookupAPI
+- Run scans from the browser GUI, or programmatically via the [REST API](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/sundowndev/phoneinfoga/master/web/docs/swagger.yaml) and [Go modules](https://pkg.go.dev/github.com/sundowndev/phoneinfoga/v2)
+
+## Quick start
+
+```bash
+# 1. Copy the credentials template and fill in the scanners you want.
+cp .env.example .env
+
+# 2. Serve the web client + API (reads .env automatically).
+phoneinfoga serve
+```
+
+Every scanner is skipped cleanly when its credentials are absent, so you can start with none configured and enable providers incrementally. See [`.env.example`](./.env.example) for the full, annotated list of environment variables and [`docs/features/`](./docs/features/) for the design spec behind each scanner.
 
 ## Anti-features
 
-- Does not claim to provide relevant or verified data, it's just a tool !
-- Does not allow to "track" a phone or its owner in real time
-- Does not allow to get the precise phone location
-- Does not allow to hack a phone
+- Does not claim to provide relevant or verified data — it's just a tool!
+- Does not "track" a phone or its owner in real time
+- Does not get precise phone location
+- Does not hack a phone
 
 ## License
 
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fsundowndev%2FPhoneInfoga.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fsundowndev%2FPhoneInfoga?ref=badge_shield)
-
-This tool is licensed under the GNU General Public License v3.0.
+This tool is licensed under the GNU General Public License v3.0, following upstream [sundowndev/phoneinfoga](https://github.com/sundowndev/phoneinfoga).
 
 [Icon](https://www.flaticon.com/free-icon/fingerprint-search-symbol-of-secret-service-investigation_48838) made by <a href="https://www.freepik.com/" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/" title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a>.
-
-## Support
-
-Support me by signing up to DigitalOcean using my link ($200 free credits)
-
-[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=31f5ef768eb3&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
-
-<div align="center">
-  <img src="https://github.com/sundowndev/static/raw/main/sponsors.svg?v=c68eba9" width="100%" heigh="auto" />
-</div>
