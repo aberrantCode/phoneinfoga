@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/sundowndev/phoneinfoga/v2/lib/number"
 	"github.com/sundowndev/phoneinfoga/v2/lib/remote"
 	"github.com/sundowndev/phoneinfoga/v2/web/v2/api"
@@ -132,13 +133,13 @@ type RunScannerInput struct {
 }
 
 // persistScannerResult best-effort persists a scanner result when a lookupId is supplied and
-// a store is configured. Persistence must never affect the /run response (spec §7); the store
-// error is intentionally swallowed here and surfaced as a warning in task 4.3.
+// a store is configured. Persistence must never affect the /run response (spec §7): a store
+// error is logged as a warning and otherwise ignored (availability > durability).
 func persistScannerResult(ctx *gin.Context, lookupID, scanner, status, errMessage string, raw json.RawMessage, startedAt, finishedAt time.Time) {
 	if Store == nil || lookupID == "" {
 		return
 	}
-	_ = Store.SaveScannerResult(ctx.Request.Context(), store.ScannerResult{
+	if err := Store.SaveScannerResult(ctx.Request.Context(), store.ScannerResult{
 		LookupID:     lookupID,
 		Scanner:      scanner,
 		Status:       status,
@@ -147,7 +148,11 @@ func persistScannerResult(ctx *gin.Context, lookupID, scanner, status, errMessag
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
 		DurationMs:   finishedAt.Sub(startedAt).Milliseconds(),
-	})
+	}); err != nil {
+		logrus.WithError(err).
+			WithFields(logrus.Fields{"lookupId": lookupID, "scanner": scanner}).
+			Warn("Failed to persist scanner result; returning scan result anyway")
+	}
 }
 
 type RunScannerResponse struct {

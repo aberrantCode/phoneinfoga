@@ -86,6 +86,21 @@ func TestRunScannerPersistsErrorWithLookupID(t *testing.T) {
 	assert.Empty(t, r.RawResponse)
 }
 
+func TestRunScannerPersistenceFailureIsNonFatal(t *testing.T) {
+	newLookupTestStore(t)
+	withFakeScanner(func(m *mocks.Scanner) {
+		m.On("Run", *test.NewFakeUSNumber(), remote.ScannerOptions{}).
+			Return(persistScanResponse{Info: "test"}, nil)
+	})
+
+	// lookupId has no parent row, so SaveScannerResult fails the FK constraint. The scan
+	// result must still be returned unaffected (spec §7, availability > durability).
+	w := doJSON(t, server.NewServer(), http.MethodPost, "/v2/scanners/fakeScanner/run",
+		handlers.RunScannerInput{Number: "14152229670", LookupID: "ghost-lookup-id"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), `"info":"test"`)
+}
+
 func TestRunScannerWithoutLookupIDPersistsNothing(t *testing.T) {
 	s := newLookupTestStore(t)
 	l := seedRunLookup(t, s)

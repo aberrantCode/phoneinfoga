@@ -146,9 +146,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   guarded on nil store / empty id). Times around `scanner.Run`; success persists
   `json.Marshal(result)` verbatim, error persists status+message. RED suite GREEN; existing
   RunScanner tests unchanged (AC13). `RunScanner`/`persistScannerResult` 100% coverage.
-- [ ] **4.3** `feat` Make persistence non-fatal: on store error, log warn and still return
+- [x] **4.3** `feat` Make persistence non-fatal: on store error, log warn and still return
   the scan result (spec §7).
-- **Gate:** `go test ./web/v2/api/...` green; AC1–AC3, AC13 covered.
+  `persistScannerResult` now logs a `logrus.Warn` (lookupId+scanner fields) on
+  `SaveScannerResult` error instead of silently swallowing; the scan result is returned
+  regardless. Regression test forces an FK violation (lookupId with no parent row) and asserts
+  `/run` still returns 200. `persistScannerResult` 100% coverage (both branches).
+- **Gate:** ✅ `go test ./web/v2/api/...` green; AC1–AC3, AC13 covered.
 
 ## Phase 5 — Frontend API client & state model
 
