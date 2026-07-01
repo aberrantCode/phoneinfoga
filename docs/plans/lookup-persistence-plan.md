@@ -98,8 +98,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `number` built-in validator → 400 on bad input. Handler-level tests (direct gin.Context):
   happy/persisted (AC1), invalid number, nil store. Route registered in 3.6. Handler 80%,
   pkg 95.2%.
-- [ ] **3.2** `feat` `POST /v2/lookups/:id/close` → `CloseLookup`; return summary; `404`
+- [x] **3.2** `feat` `POST /v2/lookups/:id/close` → `CloseLookup`; return summary; `404`
   if unknown id.
+  `CloseLookup` handler + `CloseLookupResponse` summary (id/status/scannersRequested/created/
+  completed); `errors.Is(err, store.ErrLookupNotFound)` → 404; nil-store → 500. Tests: complete
+  close, 404, nil store. Route registered in 3.6. Pkg coverage 94.4%.
 - [ ] **3.3** `feat` `GET /v2/lookups/:id` → full detail (spec §7); `404` if missing.
 - [ ] **3.4** `feat` `GET /v2/lookups/latest?number=` → newest for number, full detail;
   `400` if `number` missing, `404` if none.

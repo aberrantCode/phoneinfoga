@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -9,6 +10,15 @@ import (
 	"github.com/sundowndev/phoneinfoga/v2/web/v2/api"
 	"github.com/sundowndev/phoneinfoga/v2/web/v2/api/store"
 )
+
+// lookupNotFound is the 404 response for an unknown lookup id.
+func lookupNotFound() *api.Response {
+	return &api.Response{
+		Code: http.StatusNotFound,
+		JSON: true,
+		Data: api.ErrorResponse{Error: "Lookup not found"},
+	}
+}
 
 // CreateLookupInput is the request body for POST /v2/lookups.
 type CreateLookupInput struct {
@@ -122,6 +132,56 @@ func CreateLookup(ctx *gin.Context) *api.Response {
 			ClientIP:          created.ClientIP,
 			CreatedAt:         created.CreatedAt,
 			Status:            created.Status,
+		},
+	}
+}
+
+// CloseLookupResponse summarizes a finalized lookup.
+type CloseLookupResponse struct {
+	ID                string     `json:"id"`
+	Status            string     `json:"status"`
+	ScannersRequested []string   `json:"scannersRequested"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	CompletedAt       *time.Time `json:"completedAt"`
+}
+
+// CloseLookup is an HTTP handler
+// @ID CloseLookup
+// @Tags Lookups
+// @Summary Finalize a lookup
+// @Description Sets completed_at and computes the complete/partial status for a lookup.
+// @Produce  json
+// @Success 200 {object} CloseLookupResponse
+// @Success 404 {object} api.ErrorResponse
+// @Success 500 {object} api.ErrorResponse
+// @Router /v2/lookups/{id}/close [post]
+// @Param id path string true "Lookup id" validate(required)
+func CloseLookup(ctx *gin.Context) *api.Response {
+	if Store == nil {
+		return storeUnavailable()
+	}
+
+	closed, err := Store.CloseLookup(ctx.Request.Context(), ctx.Param("id"))
+	if errors.Is(err, store.ErrLookupNotFound) {
+		return lookupNotFound()
+	}
+	if err != nil {
+		return &api.Response{
+			Code: http.StatusInternalServerError,
+			JSON: true,
+			Data: api.ErrorResponse{Error: err.Error()},
+		}
+	}
+
+	return &api.Response{
+		Code: http.StatusOK,
+		JSON: true,
+		Data: CloseLookupResponse{
+			ID:                closed.ID,
+			Status:            closed.Status,
+			ScannersRequested: closed.ScannersRequested,
+			CreatedAt:         closed.CreatedAt,
+			CompletedAt:       closed.CompletedAt,
 		},
 	}
 }

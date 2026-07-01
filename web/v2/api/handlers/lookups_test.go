@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -84,6 +85,64 @@ func TestCreateLookupHandlerWithoutStore(t *testing.T) {
 
 	ctx := newJSONContext(t, handlers.CreateLookupInput{Number: "14152229670"})
 	resp := handlers.CreateLookup(ctx)
+
+	assert.Equal(t, http.StatusInternalServerError, resp.Code)
+}
+
+// newParamContext builds a gin.Context carrying route params (no request body).
+func newParamContext(t *testing.T, params gin.Params) *gin.Context {
+	t.Helper()
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	ctx.Params = params
+	return ctx
+}
+
+func seedLookup(t *testing.T, s *store.SQLiteStore, scanners ...string) store.Lookup {
+	t.Helper()
+	l, err := s.CreateLookup(context.Background(), store.Lookup{
+		E164: "+14152229670", NumberInput: "14152229670", Valid: true,
+		ScannersRequested: scanners,
+	})
+	require.NoError(t, err)
+	return l
+}
+
+func TestCloseLookupHandlerComplete(t *testing.T) {
+	s := newLookupTestStore(t)
+	l := seedLookup(t, s, "local")
+	now := time.Now().UTC()
+	require.NoError(t, s.SaveScannerResult(context.Background(), store.ScannerResult{
+		LookupID: l.ID, Scanner: "local", Status: store.ResultStatusSuccess,
+		StartedAt: now, FinishedAt: now, DurationMs: 1,
+	}))
+
+	ctx := newParamContext(t, gin.Params{{Key: "id", Value: l.ID}})
+	resp := handlers.CloseLookup(ctx)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	data, ok := resp.Data.(handlers.CloseLookupResponse)
+	require.True(t, ok, "unexpected response type %T", resp.Data)
+	assert.Equal(t, l.ID, data.ID)
+	assert.Equal(t, store.StatusComplete, data.Status)
+	require.NotNil(t, data.CompletedAt)
+}
+
+func TestCloseLookupHandlerNotFound(t *testing.T) {
+	newLookupTestStore(t)
+
+	ctx := newParamContext(t, gin.Params{{Key: "id", Value: "no-such-id"}})
+	resp := handlers.CloseLookup(ctx)
+
+	assert.Equal(t, http.StatusNotFound, resp.Code)
+}
+
+func TestCloseLookupHandlerWithoutStore(t *testing.T) {
+	handlers.InitStore(nil)
+
+	ctx := newParamContext(t, gin.Params{{Key: "id", Value: "x"}})
+	resp := handlers.CloseLookup(ctx)
 
 	assert.Equal(t, http.StatusInternalServerError, resp.Code)
 }
