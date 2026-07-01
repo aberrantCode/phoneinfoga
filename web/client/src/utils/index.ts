@@ -139,6 +139,121 @@ const getDefaultScannerNames = (scanners: ScannerAvailability[]): string[] => {
   return preferred.filter((name) => configured.includes(name));
 };
 
+interface NumberMetadata {
+  valid: boolean;
+  rawLocal: string;
+  local: string;
+  e164: string;
+  international: string;
+  countryCode: number;
+  country: string;
+  carrier: string;
+}
+
+interface LookupResult {
+  scanner: string;
+  status: string;
+  errorMessage?: string;
+  raw: unknown;
+  durationMs: number;
+  startedAt: string;
+  finishedAt: string;
+}
+
+interface LookupDetail {
+  id: string;
+  status: string;
+  createdAt: string;
+  completedAt: string | null;
+  clientIp: string;
+  userAgent: string;
+  number: NumberMetadata;
+  scannersRequested: string[];
+  results: LookupResult[];
+}
+
+interface LookupSummary {
+  id: string;
+  e164: string;
+  status: string;
+  scannersRequested: string[];
+  createdAt: string;
+  completedAt: string | null;
+}
+
+interface CreateLookupResult {
+  id: string;
+  number: NumberMetadata;
+  scannersRequested: string[];
+  clientIp: string;
+  createdAt: string;
+  status: string;
+}
+
+interface CloseLookupResult {
+  id: string;
+  status: string;
+  scannersRequested: string[];
+  createdAt: string;
+  completedAt: string | null;
+}
+
+// createLookup records a new lookup request (before any scanner runs) and returns
+// its id and captured metadata.
+const createLookup = async (
+  number: string,
+  scanners: string[]
+): Promise<CreateLookupResult> => {
+  const res = await axios.post(`${config.apiUrl}/v2/lookups`, {
+    number,
+    scanners,
+  });
+
+  return res.data;
+};
+
+// closeLookup finalizes a lookup, computing its complete/partial status.
+const closeLookup = async (id: string): Promise<CloseLookupResult> => {
+  const res = await axios.post(`${config.apiUrl}/v2/lookups/${id}/close`);
+
+  return res.data;
+};
+
+// getLookup returns a lookup's full detail (metadata + all scanner results).
+const getLookup = async (id: string): Promise<LookupDetail> => {
+  const res = await axios.get(`${config.apiUrl}/v2/lookups/${id}`);
+
+  return res.data;
+};
+
+// getLatestLookup returns the most recent lookup for a number, or null when none
+// exists (HTTP 404) so callers can fall back to running a fresh lookup.
+const getLatestLookup = async (
+  number: string
+): Promise<LookupDetail | null> => {
+  const res = await axios.get(`${config.apiUrl}/v2/lookups/latest`, {
+    params: { number },
+    validateStatus: (status: number) => status === 200 || status === 404,
+  });
+
+  return res.status === 200 ? res.data : null;
+};
+
+// listLookups returns a number's lookup summaries, newest first.
+const listLookups = async (
+  number: string,
+  limit?: number
+): Promise<LookupSummary[]> => {
+  const params: { number: string; limit?: number } = { number };
+  if (typeof limit === "number") {
+    params.limit = limit;
+  }
+
+  const res = await axios.get(`${config.apiUrl}/v2/lookups`, { params });
+
+  return res.data.lookups;
+};
+
 const getScannerAvailability = async (): Promise<ScannerAvailability[]> => {
   const scanners = await getScanners();
 
@@ -185,5 +300,19 @@ export {
   getSearXNGDelayMs,
   setSearXNGDelayMs,
   getScannerRunOptions,
+  createLookup,
+  closeLookup,
+  getLookup,
+  getLatestLookup,
+  listLookups,
 };
-export type { ScannerObject, ScannerAvailability };
+export type {
+  ScannerObject,
+  ScannerAvailability,
+  NumberMetadata,
+  LookupResult,
+  LookupDetail,
+  LookupSummary,
+  CreateLookupResult,
+  CloseLookupResult,
+};

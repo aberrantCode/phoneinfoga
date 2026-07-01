@@ -156,8 +156,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 5 — Frontend API client & state model
 
-- [ ] **5.1** `feat` Add lookup API calls to `web/client/src/utils/index.ts`:
+- [x] **5.1** `feat` Add lookup API calls to `web/client/src/utils/index.ts`:
   `createLookup`, `closeLookup`, `getLookup`, `getLatestLookup`, `listLookups`.
+  Typed client + `LookupDetail`/`LookupSummary`/etc. interfaces. `getLatestLookup` uses
+  `validateStatus` to return `null` on 404 (for the replay-vs-fresh branch in 7.1). 6 Jest
+  tests (axios mocked). Lint clean, `yarn build` + full 64-test suite green.
 - [ ] **5.2** `feat` Thread optional `lookupId` through the existing per-scanner `run`
   call (Scanner.vue / utils) without changing behavior when absent.
 - [ ] **5.3** `feat` Introduce a `viewState` model in `Scan.vue`
