@@ -108,8 +108,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `lookupDetail`); `raw` field emits verbatim payload / JSON `null` for errors (no omitempty).
   `nil` result → 404, nil store → 500. Tests: full detail + ordering, 404, nil store. Route
   in 3.6. Pkg coverage 94.1%.
-- [ ] **3.4** `feat` `GET /v2/lookups/latest?number=` → newest for number, full detail;
+- [x] **3.4** `feat` `GET /v2/lookups/latest?number=` → newest for number, full detail;
   `400` if `number` missing, `404` if none.
+  `GetLatestLookup` handler + shared `e164FromQuery` (normalizes via `number.NewNumber`, 400 on
+  missing/invalid). Reuses `lookupDetail`. Tests: newest returned, missing/invalid number → 400,
+  none → 404, nil store → 500. Route in 3.6. Pkg coverage 94.2%.
 - [ ] **3.5** `feat` `GET /v2/lookups?number=&limit=` → per-number summaries newest-first;
   `400` if `number` missing; never returns other numbers.
 - [ ] **3.6** `feat` Register all five routes in `web/v2/api/server/server.go`.

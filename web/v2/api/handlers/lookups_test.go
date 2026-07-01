@@ -205,3 +205,53 @@ func TestGetLookupHandlerWithoutStore(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, resp.Code)
 }
+
+// newGetContext builds a gin.Context for a GET request at target (may include a query).
+func newGetContext(t *testing.T, target string) *gin.Context {
+	t.Helper()
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest(http.MethodGet, target, nil)
+	return ctx
+}
+
+func TestGetLatestLookupHandler(t *testing.T) {
+	s := newLookupTestStore(t)
+	_ = seedLookup(t, s, "local")
+	time.Sleep(2 * time.Millisecond)
+	newer := seedLookup(t, s, "local")
+
+	ctx := newGetContext(t, "/v2/lookups/latest?number=14152229670")
+	resp := handlers.GetLatestLookup(ctx)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	data, ok := resp.Data.(handlers.LookupDetailResponse)
+	require.True(t, ok, "unexpected response type %T", resp.Data)
+	assert.Equal(t, newer.ID, data.ID, "latest should be the newest lookup")
+	assert.Equal(t, "+14152229670", data.Number.E164)
+}
+
+func TestGetLatestLookupHandlerMissingNumber(t *testing.T) {
+	newLookupTestStore(t)
+	resp := handlers.GetLatestLookup(newGetContext(t, "/v2/lookups/latest"))
+	assert.Equal(t, http.StatusBadRequest, resp.Code)
+}
+
+func TestGetLatestLookupHandlerInvalidNumber(t *testing.T) {
+	newLookupTestStore(t)
+	resp := handlers.GetLatestLookup(newGetContext(t, "/v2/lookups/latest?number=abc"))
+	assert.Equal(t, http.StatusBadRequest, resp.Code)
+}
+
+func TestGetLatestLookupHandlerNone(t *testing.T) {
+	newLookupTestStore(t)
+	// Valid number, but no lookups stored for it.
+	resp := handlers.GetLatestLookup(newGetContext(t, "/v2/lookups/latest?number=447700900123"))
+	assert.Equal(t, http.StatusNotFound, resp.Code)
+}
+
+func TestGetLatestLookupHandlerWithoutStore(t *testing.T) {
+	handlers.InitStore(nil)
+	resp := handlers.GetLatestLookup(newGetContext(t, "/v2/lookups/latest?number=14152229670"))
+	assert.Equal(t, http.StatusInternalServerError, resp.Code)
+}

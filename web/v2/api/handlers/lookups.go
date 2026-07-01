@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,29 @@ import (
 	"github.com/sundowndev/phoneinfoga/v2/web/v2/api"
 	"github.com/sundowndev/phoneinfoga/v2/web/v2/api/store"
 )
+
+// e164FromQuery reads and normalizes the required `number` query parameter to E164. On a
+// missing or invalid number it returns an empty string and a 400 response to return as-is.
+// History endpoints require a number and only ever return that number's lookups (spec §7).
+func e164FromQuery(ctx *gin.Context) (string, *api.Response) {
+	raw := ctx.Query("number")
+	if strings.TrimSpace(raw) == "" {
+		return "", &api.Response{
+			Code: http.StatusBadRequest,
+			JSON: true,
+			Data: api.ErrorResponse{Error: "Missing required query parameter: number"},
+		}
+	}
+	num, err := number.NewNumber(raw)
+	if err != nil {
+		return "", &api.Response{
+			Code: http.StatusBadRequest,
+			JSON: true,
+			Data: api.ErrorResponse{Error: err.Error()},
+		}
+	}
+	return num.E164, nil
+}
 
 // lookupNotFound is the 404 response for an unknown lookup id.
 func lookupNotFound() *api.Response {
@@ -203,6 +227,47 @@ func GetLookup(ctx *gin.Context) *api.Response {
 	}
 
 	l, err := Store.GetLookup(ctx.Request.Context(), ctx.Param("id"))
+	if err != nil {
+		return &api.Response{
+			Code: http.StatusInternalServerError,
+			JSON: true,
+			Data: api.ErrorResponse{Error: err.Error()},
+		}
+	}
+	if l == nil {
+		return lookupNotFound()
+	}
+
+	return &api.Response{
+		Code: http.StatusOK,
+		JSON: true,
+		Data: lookupDetail(*l),
+	}
+}
+
+// GetLatestLookup is an HTTP handler
+// @ID GetLatestLookup
+// @Tags Lookups
+// @Summary Get the most recent lookup for a number
+// @Description Returns the newest lookup for a number (full detail) for replay. Requires the number query parameter.
+// @Produce  json
+// @Success 200 {object} LookupDetailResponse
+// @Success 400 {object} api.ErrorResponse
+// @Success 404 {object} api.ErrorResponse
+// @Success 500 {object} api.ErrorResponse
+// @Router /v2/lookups/latest [get]
+// @Param number query string true "Phone number"
+func GetLatestLookup(ctx *gin.Context) *api.Response {
+	if Store == nil {
+		return storeUnavailable()
+	}
+
+	e164, errResp := e164FromQuery(ctx)
+	if errResp != nil {
+		return errResp
+	}
+
+	l, err := Store.GetLatestLookupByNumber(ctx.Request.Context(), e164)
 	if err != nil {
 		return &api.Response{
 			Code: http.StatusInternalServerError,
