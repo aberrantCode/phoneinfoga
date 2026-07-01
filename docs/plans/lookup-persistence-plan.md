@@ -38,8 +38,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   structs (fields per spec §5), `Store` interface (spec §6), status constants.
   `CompletedAt *time.Time` (nullable), `RawResponse json.RawMessage` (verbatim), status
   consts `Status*`/`ResultStatus*`. `models_test.go` asserts constant values + hydration.
-- [ ] **1.2** `feat` Add UUIDv4 helper `web/v2/api/store/id.go` using `crypto/rand`
+- [x] **1.2** `feat` Add UUIDv4 helper `web/v2/api/store/id.go` using `crypto/rand`
   (no new dependency) + a unit test asserting format/uniqueness.
+  `NewUUID()` sets RFC 4122 version/variant bits; tests assert canonical v4 regex + 1000
+  unique ids. Package coverage 83.3%.
 - [ ] **1.3** `feat` Add migration `web/v2/api/store/migrations/0001_init.sql` (both
   tables + indexes per spec §5). Embed via `embed.FS`.
 - [ ] **1.4** `test` Write `store_test.go` (RED): open temp-file DB → `Migrate` →
