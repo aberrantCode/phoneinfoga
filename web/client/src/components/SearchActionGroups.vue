@@ -525,8 +525,16 @@ export default class SearchActionGroups extends Vue {
     this.stopLauncher();
   }
 
-  startLauncher(dorks: LaunchableSearch[]): void {
-    const queued = dorks.filter((dork) => !this.openedUrls.has(dork.url));
+  // Accepts any row that may carry a search URL (Google dorks always do;
+  // SearXNG query results type it as optional). Rows without a usable URL are
+  // dropped — they were never launchable.
+  startLauncher(dorks: Array<{ url?: string }>): void {
+    const queued: LaunchableSearch[] = dorks.filter(
+      (dork): dork is LaunchableSearch =>
+        typeof dork.url === "string" &&
+        dork.url !== "" &&
+        !this.openedUrls.has(dork.url)
+    );
     if (queued.length === 0) {
       return;
     }
