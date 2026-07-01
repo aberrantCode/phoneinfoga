@@ -146,3 +146,62 @@ func TestCloseLookupHandlerWithoutStore(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, resp.Code)
 }
+
+// seedLookupWithResults seeds a lookup plus one success and one error scanner result.
+func seedLookupWithResults(t *testing.T, s *store.SQLiteStore) store.Lookup {
+	t.Helper()
+	l := seedLookup(t, s, "local", "numverify")
+	now := time.Now().UTC()
+	require.NoError(t, s.SaveScannerResult(context.Background(), store.ScannerResult{
+		LookupID: l.ID, Scanner: "local", Status: store.ResultStatusSuccess,
+		RawResponse: []byte(`{"valid":true}`), StartedAt: now, FinishedAt: now.Add(time.Millisecond), DurationMs: 1,
+	}))
+	require.NoError(t, s.SaveScannerResult(context.Background(), store.ScannerResult{
+		LookupID: l.ID, Scanner: "numverify", Status: store.ResultStatusError,
+		ErrorMessage: "quota exceeded", StartedAt: now.Add(2 * time.Millisecond), FinishedAt: now.Add(3 * time.Millisecond), DurationMs: 1,
+	}))
+	return l
+}
+
+func TestGetLookupHandler(t *testing.T) {
+	s := newLookupTestStore(t)
+	l := seedLookupWithResults(t, s)
+
+	ctx := newParamContext(t, gin.Params{{Key: "id", Value: l.ID}})
+	resp := handlers.GetLookup(ctx)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	data, ok := resp.Data.(handlers.LookupDetailResponse)
+	require.True(t, ok, "unexpected response type %T", resp.Data)
+
+	assert.Equal(t, l.ID, data.ID)
+	assert.Equal(t, "+14152229670", data.Number.E164)
+	assert.Equal(t, []string{"local", "numverify"}, data.ScannersRequested)
+	require.Len(t, data.Results, 2)
+
+	// Ordered by started_at: success (verbatim raw) then error (raw null + message).
+	assert.Equal(t, "local", data.Results[0].Scanner)
+	assert.JSONEq(t, `{"valid":true}`, string(data.Results[0].Raw))
+	assert.Equal(t, "numverify", data.Results[1].Scanner)
+	assert.Equal(t, store.ResultStatusError, data.Results[1].Status)
+	assert.Equal(t, "quota exceeded", data.Results[1].ErrorMessage)
+	assert.Nil(t, data.Results[1].Raw)
+}
+
+func TestGetLookupHandlerNotFound(t *testing.T) {
+	newLookupTestStore(t)
+
+	ctx := newParamContext(t, gin.Params{{Key: "id", Value: "missing"}})
+	resp := handlers.GetLookup(ctx)
+
+	assert.Equal(t, http.StatusNotFound, resp.Code)
+}
+
+func TestGetLookupHandlerWithoutStore(t *testing.T) {
+	handlers.InitStore(nil)
+
+	ctx := newParamContext(t, gin.Params{{Key: "id", Value: "x"}})
+	resp := handlers.GetLookup(ctx)
+
+	assert.Equal(t, http.StatusInternalServerError, resp.Code)
+}

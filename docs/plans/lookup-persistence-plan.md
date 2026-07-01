@@ -103,7 +103,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `CloseLookup` handler + `CloseLookupResponse` summary (id/status/scannersRequested/created/
   completed); `errors.Is(err, store.ErrLookupNotFound)` → 404; nil-store → 500. Tests: complete
   close, 404, nil store. Route registered in 3.6. Pkg coverage 94.4%.
-- [ ] **3.3** `feat` `GET /v2/lookups/:id` → full detail (spec §7); `404` if missing.
+- [x] **3.3** `feat` `GET /v2/lookups/:id` → full detail (spec §7); `404` if missing.
+  `GetLookup` handler + shared `lookup_detail.go` projection (`LookupDetailResponse`,
+  `lookupDetail`); `raw` field emits verbatim payload / JSON `null` for errors (no omitempty).
+  `nil` result → 404, nil store → 500. Tests: full detail + ordering, 404, nil store. Route
+  in 3.6. Pkg coverage 94.1%.
 - [ ] **3.4** `feat` `GET /v2/lookups/latest?number=` → newest for number, full detail;
   `400` if `number` missing, `404` if none.
 - [ ] **3.5** `feat` `GET /v2/lookups?number=&limit=` → per-number summaries newest-first;

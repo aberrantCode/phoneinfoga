@@ -185,3 +185,38 @@ func CloseLookup(ctx *gin.Context) *api.Response {
 		},
 	}
 }
+
+// GetLookup is an HTTP handler
+// @ID GetLookup
+// @Tags Lookups
+// @Summary Get a lookup's full detail
+// @Description Returns the full lookup detail (metadata + all scanner results).
+// @Produce  json
+// @Success 200 {object} LookupDetailResponse
+// @Success 404 {object} api.ErrorResponse
+// @Success 500 {object} api.ErrorResponse
+// @Router /v2/lookups/{id} [get]
+// @Param id path string true "Lookup id" validate(required)
+func GetLookup(ctx *gin.Context) *api.Response {
+	if Store == nil {
+		return storeUnavailable()
+	}
+
+	l, err := Store.GetLookup(ctx.Request.Context(), ctx.Param("id"))
+	if err != nil {
+		return &api.Response{
+			Code: http.StatusInternalServerError,
+			JSON: true,
+			Data: api.ErrorResponse{Error: err.Error()},
+		}
+	}
+	if l == nil {
+		return lookupNotFound()
+	}
+
+	return &api.Response{
+		Code: http.StatusOK,
+		JSON: true,
+		Data: lookupDetail(*l),
+	}
+}
