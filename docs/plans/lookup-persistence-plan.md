@@ -90,10 +90,14 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 3 — Lookup lifecycle + read API (TDD)
 
-- [ ] **3.1** `feat` `web/v2/api/handlers/lookups.go` — `POST /v2/lookups`:
+- [x] **3.1** `feat` `web/v2/api/handlers/lookups.go` — `POST /v2/lookups`:
   validate number, build metadata (reuse `number.NewNumber`), capture
   `ctx.ClientIP()` + `User-Agent`, `CreateLookup(status=pending)`, return
   `{id, number, scannersRequested, clientIp, createdAt, status}`.
+  `CreateLookup` handler + `CreateLookupInput`/`CreateLookupResponse`; nil-store guard (500);
+  `number` built-in validator → 400 on bad input. Handler-level tests (direct gin.Context):
+  happy/persisted (AC1), invalid number, nil store. Route registered in 3.6. Handler 80%,
+  pkg 95.2%.
 - [ ] **3.2** `feat` `POST /v2/lookups/:id/close` → `CloseLookup`; return summary; `404`
   if unknown id.
 - [ ] **3.3** `feat` `GET /v2/lookups/:id` → full detail (spec §7); `404` if missing.
