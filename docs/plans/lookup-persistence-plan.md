@@ -185,8 +185,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `lookupRecordItems` computed derives time/IP/scanners/status from `viewState.activeLookup`
   (empty in entry). New "Request record" sub-panel inside the Metadata card; card now also
   renders in results state. Scan.spec covers the computed. Lint + 74 tests + build green.
-- [ ] **6.3** `feat` Fresh-lookup orchestration: `createLookup` → per-scanner runs with
+- [x] **6.3** `feat` Fresh-lookup orchestration: `createLookup` → per-scanner runs with
   `lookupId` → `closeLookup` → enter `results/fresh` (AC1–AC3 end-to-end via UI).
+  `startFreshLookup` builds the scanner list, `createLookup`s (before scanners mount), sets
+  `activeLookupId` (bound to `<Scanner :lookup-id>`) and enters `results/fresh`;
+  `maybeCloseLookup` finalizes once (a `lookupClosed` latch) when every scanner settles.
+  createLookup/closeLookup failures are non-fatal. Scan.spec: create→fresh, close-on-settle,
+  non-fatal. 77 tests + lint + build green.
 - [ ] **6.4** `test` Component test: results state hides input + shows Start over; metadata
   panel shows the record fields.
 - **Gate:** manual fresh lookup persists and renders; `yarn test:unit` green.

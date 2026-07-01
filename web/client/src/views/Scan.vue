@@ -241,6 +241,7 @@
             :auto-expand-on-data="!isComparisonProvider(scanner.name)"
             :scan-options="getScannerRunOptions(scanner.name)"
             :metadata="localData"
+            :lookup-id="activeLookupId"
             @status="updateScannerStatus"
             @result="captureScannerResult"
           />
@@ -261,8 +262,11 @@ import {
   getScannerDisplayName,
   getScannerDescription,
   getScannerRunOptions,
+  createLookup,
+  closeLookup,
   ScannerAvailability,
   LookupDetail,
+  CreateLookupResult,
 } from "../utils";
 import VuePhoneNumberInput from "vue-phone-number-input";
 import Scanner from "../components/Scanner.vue";
@@ -327,6 +331,8 @@ interface Data {
   scannerStatuses: ScannerStatus[];
   scannerFailures: { [name: string]: string };
   scannerResults: { [name: string]: unknown };
+  activeLookupId: string;
+  lookupClosed: boolean;
   localData: {
     valid: boolean;
     raw_local: string;
@@ -354,10 +360,14 @@ interface ScannerStatus {
 type ViewStateName = "entry" | "results";
 type ViewStateSource = "fresh" | "replay";
 
+// A fresh lookup starts from a CreateLookupResult (record only); a replayed lookup
+// carries the full LookupDetail. Both expose the fields the record panel needs.
+type ActiveLookup = LookupDetail | CreateLookupResult;
+
 interface ViewState {
   state: ViewStateName;
   source: ViewStateSource;
-  activeLookup: LookupDetail | null;
+  activeLookup: ActiveLookup | null;
 }
 
 export type ScanResponse<T> = AxiosResponse<{
@@ -389,6 +399,8 @@ export default Vue.extend({
       scannerStatuses: [],
       scannerFailures: {},
       scannerResults: {},
+      activeLookupId: "",
+      lookupClosed: false,
       localData: {
         valid: false,
         raw_local: "",
@@ -537,7 +549,7 @@ export default Vue.extend({
     // them to drive the fresh-lookup and replay flows; clearData resets to entry.
     enterResults(
       source: ViewStateSource,
-      lookup: LookupDetail | null = null
+      lookup: ActiveLookup | null = null
     ): void {
       this.viewState = { state: "results", source, activeLookup: lookup };
     },
@@ -561,6 +573,8 @@ export default Vue.extend({
       this.comparisonExpanded = true;
       this.scannerStatuses = [];
       this.scannerResults = {};
+      this.activeLookupId = "";
+      this.lookupClosed = false;
       this.$store.commit("resetState");
     },
     async loadScannerAvailability(): Promise<void> {
@@ -598,8 +612,7 @@ export default Vue.extend({
         this.localData = res.data;
 
         if (this.localData.valid) {
-          this.getScanners();
-          this.isLookup = true;
+          await this.startFreshLookup();
         } else {
           this.showInformations = true;
         }
@@ -608,6 +621,61 @@ export default Vue.extend({
       }
 
       this.loading = false;
+    },
+    // startFreshLookup records the request (createLookup) BEFORE the scanners mount,
+    // so each per-scanner /run carries the lookupId and its result is persisted (AC1/AC2).
+    // Persistence is best-effort: a createLookup failure still renders live results.
+    async startFreshLookup(): Promise<void> {
+      await this.getScanners();
+      const scannerNames = this.scanners.map((scanner) => scanner.name);
+
+      try {
+        const record = await createLookup(
+          this.$store.state.number,
+          scannerNames
+        );
+        this.activeLookupId = record.id;
+        this.enterResults("fresh", record);
+      } catch (error) {
+        this.activeLookupId = "";
+        this.enterResults("fresh", null);
+      }
+
+      // Rendering the scanners (autoRun) starts the per-scanner runs with the lookupId.
+      this.isLookup = true;
+    },
+    // maybeCloseLookup finalizes the lookup exactly once, after every scanner has
+    // reached a terminal state (AC3). Closing is best-effort.
+    maybeCloseLookup(): void {
+      if (
+        !this.activeLookupId ||
+        this.lookupClosed ||
+        this.scanners.length === 0
+      ) {
+        return;
+      }
+
+      const settled = this.scannerStatuses.filter((status) =>
+        ["complete", "error", "canceled"].includes(status.status)
+      ).length;
+      if (settled < this.scanners.length) {
+        return;
+      }
+
+      this.lookupClosed = true;
+      closeLookup(this.activeLookupId)
+        .then((summary) => {
+          const current = this.viewState.activeLookup;
+          if (current) {
+            this.viewState = {
+              ...this.viewState,
+              activeLookup: { ...current, status: summary.status },
+            };
+          }
+        })
+        .catch(() => {
+          // Availability over durability: a failed close must not break the UI.
+        });
     },
     onSubmit(evt: Event) {
       evt.preventDefault();
@@ -664,6 +732,8 @@ export default Vue.extend({
         delete rest[status.scanId];
         this.scannerFailures = rest;
       }
+
+      this.maybeCloseLookup();
     },
     cancelRunningScanners(): void {
       const refs = this.$refs.scannerRefs as Vue[] | Vue | undefined;

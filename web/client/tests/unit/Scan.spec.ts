@@ -6,24 +6,34 @@ import { BootstrapVue, BootstrapVueIcons } from "bootstrap-vue";
 import Vuex, { Store } from "vuex";
 
 // Keep the pure helpers (display names, descriptions, default selection) real,
-// but stub the one function that hits the network so mounting the view does not
-// fire a real dryrun probe.
+// but stub the functions that hit the network so mounting/orchestration does not
+// fire real requests.
 jest.mock("@/utils", () => {
   const actual = jest.requireActual("@/utils");
   return {
     __esModule: true,
     ...actual,
     getScannerAvailability: jest.fn().mockResolvedValue([]),
+    createLookup: jest.fn(),
+    closeLookup: jest.fn(),
   };
 });
+jest.mock("axios");
 
+import axios from "axios";
 import Scan from "@/views/Scan.vue";
 import VuePhoneNumberInput from "vue-phone-number-input";
 import {
   getScannerAvailability,
   getScannerDescription,
+  createLookup,
+  closeLookup,
   ScannerAvailability,
 } from "@/utils";
+
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedCreateLookup = createLookup as jest.Mock;
+const mockedCloseLookup = closeLookup as jest.Mock;
 
 const mockedGetAvailability = getScannerAvailability as jest.Mock;
 
@@ -339,6 +349,106 @@ describe("Scan.vue", () => {
       wrapper.vm.enterResults("fresh");
       wrapper.vm.clearData();
       expect(wrapper.vm.isEntryState).toBe(true);
+    });
+  });
+
+  describe("fresh-lookup orchestration (AC1-AC3)", () => {
+    const flush = (): Promise<void> =>
+      new Promise((resolve) => setTimeout(resolve, 0));
+    const validNumber = {
+      valid: true,
+      e164: "+14152229670",
+      raw_local: "",
+      local: "",
+      international: "",
+      countryCode: 1,
+      country: "US",
+      carrier: "",
+    };
+
+    beforeEach(() => {
+      mockedCreateLookup.mockReset();
+      mockedCloseLookup.mockReset();
+      mockedAxios.post.mockReset();
+    });
+
+    // Drain the mounted() availability loader first so it can't overwrite the
+    // scanner selection we set up here mid-runScans.
+    const arrangeFreshLookup = async (
+      wrapper: Wrapper<Vue & Record<string, any>>
+    ): Promise<void> => {
+      await flush();
+      wrapper.vm.inputNumber = "14152229670";
+      wrapper.vm.scannerAvailability = [scanner("local", true)];
+      wrapper.vm.selectedScannerNames = ["local"];
+    };
+
+    it("creates a lookup and enters the fresh results state", async () => {
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-9",
+        createdAt: "2026-07-01T10:00:00Z",
+        clientIp: "1.2.3.4",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(mockedCreateLookup).toHaveBeenCalledTimes(1);
+      expect(mockedCreateLookup.mock.calls[0][1]).toEqual(["local"]);
+      expect(wrapper.vm.activeLookupId).toBe("lk-9");
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.viewState.source).toBe("fresh");
+    });
+
+    it("closes the lookup once every scanner settles", async () => {
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-9",
+        createdAt: "",
+        clientIp: "",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedCloseLookup.mockResolvedValue({
+        id: "lk-9",
+        status: "complete",
+        completedAt: "2026-07-01T10:01:00Z",
+        scannersRequested: ["local"],
+        createdAt: "",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      wrapper.vm.updateScannerStatus({
+        scanId: "local",
+        scanner: "Local",
+        status: "complete",
+        message: "done",
+      });
+      await flush();
+
+      expect(mockedCloseLookup).toHaveBeenCalledWith("lk-9");
+    });
+
+    it("still shows results when createLookup fails (persistence is non-fatal)", async () => {
+      mockedCreateLookup.mockRejectedValue(new Error("db down"));
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.activeLookupId).toBe("");
     });
   });
 
