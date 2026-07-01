@@ -174,6 +174,29 @@ func TestCloseLookupPartial(t *testing.T) {
 	require.NotNil(t, closed.CompletedAt)
 }
 
+func TestCloseLookupPartialIgnoresUnrequestedResults(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	l, err := s.CreateLookup(ctx, sampleLookup(numberA, "local", "numverify"))
+	require.NoError(t, err)
+
+	now := time.Now().UTC()
+	// One requested scanner ran, plus an *unrequested* scanner. Row count is 2 (== len
+	// requested) but numverify never ran, so the lookup must still close as partial.
+	for _, name := range []string{"local", "googlesearch"} {
+		require.NoError(t, s.SaveScannerResult(ctx, ScannerResult{
+			LookupID: l.ID, Scanner: name, Status: ResultStatusSuccess,
+			RawResponse: json.RawMessage(`{}`), StartedAt: now, FinishedAt: now, DurationMs: 1,
+		}))
+	}
+
+	closed, err := s.CloseLookup(ctx, l.ID)
+	require.NoError(t, err)
+	assert.Equal(t, StatusPartial, closed.Status,
+		"completeness is keyed on requested scanners, not row count")
+}
+
 func TestCloseLookupUnknownID(t *testing.T) {
 	s := newTestStore(t)
 	_, err := s.CloseLookup(context.Background(), "does-not-exist")

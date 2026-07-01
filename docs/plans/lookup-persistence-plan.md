@@ -62,9 +62,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   busy_timeout) always apply. Parameterized SQL throughout; `user_version` set from the
   int filename prefix only. Scan/format helpers in `rows.go`. Full RED suite GREEN; store
   coverage 80.5% (≥80% gate). `ErrLookupNotFound` exported for handler 404s.
-- [ ] **1.6** `feat` `CloseLookup` status math: `complete` if every requested scanner
+- [x] **1.6** `feat` `CloseLookup` status math: `complete` if every requested scanner
   has a result row, else `partial`. Cover both in tests.
-- **Gate:** `go test ./web/v2/api/store/...` green; ≥80% coverage on the package.
+  Membership-set logic (not row count): complete/partial + edge case where an unrequested
+  extra result must not mask a missing requested scanner. All three branches covered.
+- **Gate:** ✅ `go test ./web/v2/api/store/...` green; package coverage 80.5% (≥80%).
 
 ## Phase 2 — Config & serve wiring
 
