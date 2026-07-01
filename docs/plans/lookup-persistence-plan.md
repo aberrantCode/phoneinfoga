@@ -166,9 +166,12 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   Added `@Prop lookupId` (default `""`) to `Scanner.vue`; `runScan` adds `lookupId` to the POST
   body only when non-empty (request identical to today when absent — AC13). Scanner.spec tests
   both branches (stubbing `CancelToken.source`). Lint + 66-test suite + build green.
-- [ ] **5.3** `feat` Introduce a `viewState` model in `Scan.vue`
+- [x] **5.3** `feat` Introduce a `viewState` model in `Scan.vue`
   (`entry | results`, source `fresh | replay`, `activeLookup`).
-- **Gate:** `yarn build` (in `web/client`) succeeds; existing UI still works.
+  `viewState: {state, source, activeLookup}` + computed `isEntryState`/`isResultsState`/
+  `isReplay` + `enterResults`/`enterEntry` transitions; `clearData` calls `enterEntry`. Template
+  still keyed on `isLookup` (Phase 6 migrates it). Scan.spec covers the transitions.
+- **Gate:** ✅ `yarn build` succeeds; lint clean; existing UI unchanged (70-test suite green).
 
 ## Phase 6 — Results state, metadata panel, Start over
 

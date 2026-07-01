@@ -228,6 +228,7 @@ import {
   getScannerDescription,
   getScannerRunOptions,
   ScannerAvailability,
+  LookupDetail,
 } from "../utils";
 import VuePhoneNumberInput from "vue-phone-number-input";
 import Scanner from "../components/Scanner.vue";
@@ -263,6 +264,7 @@ interface Data {
   loading: boolean;
   scannerLoading: boolean;
   scannerError: string;
+  viewState: ViewState;
   isLookup: boolean;
   showInformations: boolean;
   informationExpanded: boolean;
@@ -299,6 +301,18 @@ interface ScannerStatus {
   error?: string;
 }
 
+// The page is a two-state flow: `entry` (number field + scanner picker) and
+// `results` (rendered lookup). Results has two sources: `fresh` (just ran) or
+// `replay` (loaded from history). activeLookup holds the replayed record, if any.
+type ViewStateName = "entry" | "results";
+type ViewStateSource = "fresh" | "replay";
+
+interface ViewState {
+  state: ViewStateName;
+  source: ViewStateSource;
+  activeLookup: LookupDetail | null;
+}
+
 export type ScanResponse<T> = AxiosResponse<{
   success: boolean;
   result: T;
@@ -312,6 +326,7 @@ export default Vue.extend({
       loading: false,
       scannerLoading: false,
       scannerError: "",
+      viewState: { state: "entry", source: "fresh", activeLookup: null },
       isLookup: false,
       showInformations: false,
       informationExpanded: true,
@@ -354,6 +369,17 @@ export default Vue.extend({
   },
   computed: {
     ...mapState(["number"]),
+    isEntryState(): boolean {
+      return this.viewState.state === "entry";
+    },
+    isResultsState(): boolean {
+      return this.viewState.state === "results";
+    },
+    isReplay(): boolean {
+      return (
+        this.viewState.state === "results" && this.viewState.source === "replay"
+      );
+    },
     metadataItems(): Array<{ label: string; value: string }> {
       const items = [
         { label: "Valid", value: this.localData.valid ? "Yes" : "No" },
@@ -440,7 +466,19 @@ export default Vue.extend({
       }
       return getScannerDescription(scanner.name);
     },
+    // enterResults / enterEntry are the two view-state transitions. Phases 6-7 use
+    // them to drive the fresh-lookup and replay flows; clearData resets to entry.
+    enterResults(
+      source: ViewStateSource,
+      lookup: LookupDetail | null = null
+    ): void {
+      this.viewState = { state: "results", source, activeLookup: lookup };
+    },
+    enterEntry(): void {
+      this.viewState = { state: "entry", source: "fresh", activeLookup: null };
+    },
     clearData() {
+      this.enterEntry();
       this.isLookup = false;
       this.showInformations = false;
       this.informationExpanded = true;

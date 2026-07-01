@@ -298,4 +298,46 @@ describe("Scan.vue", () => {
       expect(labels).not.toContain("Local"); // value was ""
     });
   });
+
+  describe("viewState model", () => {
+    it("starts in the entry state with no active lookup", () => {
+      const { wrapper } = mountScan();
+      expect(wrapper.vm.viewState).toMatchObject({
+        state: "entry",
+        source: "fresh",
+        activeLookup: null,
+      });
+      expect(wrapper.vm.isEntryState).toBe(true);
+      expect(wrapper.vm.isResultsState).toBe(false);
+      expect(wrapper.vm.isReplay).toBe(false);
+    });
+
+    it("enterResults('fresh') moves to a fresh results state", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("fresh");
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.isReplay).toBe(false);
+    });
+
+    it("enterResults('replay', lookup) records the active lookup and is a replay", () => {
+      const { wrapper } = mountScan();
+      const lookup = { id: "lk-1", results: [] };
+      wrapper.vm.enterResults("replay", lookup);
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.isReplay).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup).toBe(lookup);
+    });
+
+    it("enterEntry() (and clearData) return to the entry state", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", { id: "lk-1", results: [] });
+      wrapper.vm.enterEntry();
+      expect(wrapper.vm.isEntryState).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup).toBeNull();
+
+      wrapper.vm.enterResults("fresh");
+      wrapper.vm.clearData();
+      expect(wrapper.vm.isEntryState).toBe(true);
+    });
+  });
 });
