@@ -24,9 +24,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   Pinned `v1.28.0` (keeps the `go 1.20` directive; latest requires Go 1.23+). Anchored via a
   blank driver import in `web/v2/api/store/driver.go` so `go mod tidy` retains it. Pre-existing
   `examples/plugin` build error (`-buildmode=plugin` example, no `main`) is unrelated.
-- [ ] **0.2** `chore` Create empty package dirs: `web/v2/api/store/` and
+- [x] **0.2** `chore` Create empty package dirs: `web/v2/api/store/` and
   `web/v2/api/store/migrations/`. Add a package doc comment.
-- **Gate:** `go build ./...` passes; new dep present; no CGO required.
+  Added `store/doc.go` (package doc comment) and `store/migrations/.gitkeep` (git can't
+  track empty dirs; SQL migrations land here in task 1.3).
+- **Gate:** ✅ `go build` passes for all real packages; `modernc.org/sqlite` present; no CGO
+  (`CGO_ENABLED=0` build clean). Pre-existing `examples/plugin` `-buildmode=plugin` error is
+  out of scope (real build target is `.`, not `./...`).
 
 ## Phase 1 — Store package (TDD)
 
