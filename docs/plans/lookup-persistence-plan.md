@@ -1,0 +1,147 @@
+# Implementation Plan — Lookup Persistence & History
+
+**Spec:** [`docs/features/lookup-persistence.md`](../features/lookup-persistence.md)
+**Branch:** work on the current feature branch (or `feat/lookup-persistence` off `dev`).
+
+## How to use this checklist
+
+- Tasks are ordered; earlier phases unblock later ones. Do them **top to bottom**.
+- Each task is small, independently testable, and **must not break the build**.
+- Follow repo rules: **TDD** (write the failing test first), immutability, many small
+  files, comprehensive error handling, no `console.log`, no hardcoded values.
+- After a task passes: tick its box `[x]`, then make **one atomic conventional commit**
+  scoped to that task.
+- A phase's **Gate** must be green before moving on.
+
+Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
+
+---
+
+## Phase 0 — Scaffolding & dependencies
+
+- [x] **0.1** `chore` Add `modernc.org/sqlite` to `go.mod`; run `go mod tidy`. Verify it
+  resolves with **no CGO** (`go build ./...` on a clean env). *(go.mod, go.sum)*
+  Pinned `v1.28.0` (keeps the `go 1.20` directive; latest requires Go 1.23+). Anchored via a
+  blank driver import in `web/v2/api/store/driver.go` so `go mod tidy` retains it. Pre-existing
+  `examples/plugin` build error (`-buildmode=plugin` example, no `main`) is unrelated.
+- [ ] **0.2** `chore` Create empty package dirs: `web/v2/api/store/` and
+  `web/v2/api/store/migrations/`. Add a package doc comment.
+- **Gate:** `go build ./...` passes; new dep present; no CGO required.
+
+## Phase 1 — Store package (TDD)
+
+- [ ] **1.1** `feat` Add `web/v2/api/store/models.go` — `Lookup` and `ScannerResult`
+  structs (fields per spec §5), `Store` interface (spec §6), status constants.
+- [ ] **1.2** `feat` Add UUIDv4 helper `web/v2/api/store/id.go` using `crypto/rand`
+  (no new dependency) + a unit test asserting format/uniqueness.
+- [ ] **1.3** `feat` Add migration `web/v2/api/store/migrations/0001_init.sql` (both
+  tables + indexes per spec §5). Embed via `embed.FS`.
+- [ ] **1.4** `test` Write `store_test.go` (RED): open temp-file DB → `Migrate` →
+  `CreateLookup` → `SaveScannerResult` (success + error rows) → `CloseLookup` →
+  `GetLookup`/`GetLatestLookupByNumber`/`ListLookupsByNumber`. Assert ordering,
+  hydration, cascade delete, upsert on duplicate `(lookup_id, scanner)`, and
+  `Migrate` idempotency.
+- [ ] **1.5** `feat` Implement `web/v2/api/store/sqlite.go` (`sqliteStore`) to GREEN:
+  `sql.Open("sqlite", path)`, WAL/busy_timeout/foreign_keys PRAGMAs, `os.MkdirAll`
+  on parent dir, embedded migration runner via `PRAGMA user_version`.
+- [ ] **1.6** `feat` `CloseLookup` status math: `complete` if every requested scanner
+  has a result row, else `partial`. Cover both in tests.
+- **Gate:** `go test ./web/v2/api/store/...` green; ≥80% coverage on the package.
+
+## Phase 2 — Config & serve wiring
+
+- [ ] **2.1** `feat` Add `handlers.InitStore(store)` + package var `Store` in
+  `web/v2/api/handlers/init.go` (mirror `RemoteLibrary` pattern).
+- [ ] **2.2** `feat` Resolve `PHONEINFOGA_DB_PATH` (default `./phoneinfoga.db`) in
+  `cmd/serve.go` `PreRun`; open store, `Migrate()`, `handlers.InitStore(store)`;
+  `exitWithError` on failure.
+- [ ] **2.3** `test` Add a serve-wiring test (or extend existing) asserting `handlers.Store`
+  is non-nil after init with a temp path.
+- **Gate:** `phoneinfoga serve` boots, creates the DB file, and migrates cleanly.
+
+## Phase 3 — Lookup lifecycle + read API (TDD)
+
+- [ ] **3.1** `feat` `web/v2/api/handlers/lookups.go` — `POST /v2/lookups`:
+  validate number, build metadata (reuse `number.NewNumber`), capture
+  `ctx.ClientIP()` + `User-Agent`, `CreateLookup(status=pending)`, return
+  `{id, number, scannersRequested, clientIp, createdAt, status}`.
+- [ ] **3.2** `feat` `POST /v2/lookups/:id/close` → `CloseLookup`; return summary; `404`
+  if unknown id.
+- [ ] **3.3** `feat` `GET /v2/lookups/:id` → full detail (spec §7); `404` if missing.
+- [ ] **3.4** `feat` `GET /v2/lookups/latest?number=` → newest for number, full detail;
+  `400` if `number` missing, `404` if none.
+- [ ] **3.5** `feat` `GET /v2/lookups?number=&limit=` → per-number summaries newest-first;
+  `400` if `number` missing; never returns other numbers.
+- [ ] **3.6** `feat` Register all five routes in `web/v2/api/server/server.go`.
+- [ ] **3.7** `test` `lookups_test.go` (`httptest` + injected in-memory store): happy paths,
+  `400` on missing number, `404`s, and **AC10** (no cross-number leakage).
+- **Gate:** `go test ./web/v2/api/...` green.
+
+## Phase 4 — Persist scanner results on run
+
+- [ ] **4.1** `test` Extend `scanners_test.go` (RED): `POST /run` with `lookupId` writes a
+  `scanner_results` row (success **and** error cases); **without** `lookupId` writes
+  nothing (backward compat, AC13).
+- [ ] **4.2** `feat` Add optional `LookupId` to `RunScannerInput`; in `RunScanner`, time the
+  run and — when `lookupId` present — `SaveScannerResult` (raw verbatim, status/message,
+  timing). Persist errors too.
+- [ ] **4.3** `feat` Make persistence non-fatal: on store error, log warn and still return
+  the scan result (spec §7).
+- **Gate:** `go test ./web/v2/api/...` green; AC1–AC3, AC13 covered.
+
+## Phase 5 — Frontend API client & state model
+
+- [ ] **5.1** `feat` Add lookup API calls to `web/client/src/utils/index.ts`:
+  `createLookup`, `closeLookup`, `getLookup`, `getLatestLookup`, `listLookups`.
+- [ ] **5.2** `feat` Thread optional `lookupId` through the existing per-scanner `run`
+  call (Scanner.vue / utils) without changing behavior when absent.
+- [ ] **5.3** `feat` Introduce a `viewState` model in `Scan.vue`
+  (`entry | results`, source `fresh | replay`, `activeLookup`).
+- **Gate:** `yarn build` (in `web/client`) succeeds; existing UI still works.
+
+## Phase 6 — Results state, metadata panel, Start over
+
+- [ ] **6.1** `feat` In results state, **hide** the phone-number field, country selector,
+  and Lookup button; render a **Start over** control that resets to entry (AC6).
+- [ ] **6.2** `feat` Extend the metadata panel to show request/results record: lookup time,
+  client IP, scanners requested, overall status (AC5) — alongside existing number metadata.
+- [ ] **6.3** `feat` Fresh-lookup orchestration: `createLookup` → per-scanner runs with
+  `lookupId` → `closeLookup` → enter `results/fresh` (AC1–AC3 end-to-end via UI).
+- [ ] **6.4** `test` Component test: results state hides input + shows Start over; metadata
+  panel shows the record fields.
+- **Gate:** manual fresh lookup persists and renders; `yarn test:unit` green.
+
+## Phase 7 — Replay, Run new lookup, Previous lookups dropdown
+
+- [ ] **7.1** `feat` On Lookup click, call `getLatestLookup`; on **200** enter `results/replay`
+  and render stored detail with **no** scans; on **404** run a fresh lookup (AC7).
+- [ ] **7.2** `feat` Add **Run new lookup** (forces fresh scan of the same number, AC8).
+- [ ] **7.3** `feat` Add **Previous lookups ▾** dropdown: `listLookups(number)`; selecting an
+  entry loads `getLookup(id)` and renders in `replay` mode (AC9).
+- [ ] **7.4** `feat` Replay banner ("Showing your most recent lookup from &lt;time&gt;").
+- [ ] **7.5** `test` Component tests: entry→replay on 200 (**assert no `/run` calls**),
+  entry→fresh on 404, Run new lookup re-scans, dropdown loads detail (AC7–AC9).
+- **Gate:** `yarn test:unit` green; manual replay path shows results without re-scanning.
+
+## Phase 8 — Docker, purge script, docs
+
+- [ ] **8.1** `chore` `support/docker/docker-compose.yml`: add
+  `PHONEINFOGA_DB_PATH=/app/data/phoneinfoga.db` env + `./data:/app/data` volume.
+- [ ] **8.2** `chore` `.env.example`: document `PHONEINFOGA_DB_PATH`.
+- [ ] **8.3** `feat` `support/scripts/purge-lookups.sh`: delete records older than N days
+  (arg/env) and `VACUUM`. Idempotent.
+- [ ] **8.4** `docs` README self-hosting section: DB path, volume mount, **backup = copy
+  `./data` (incl. `-wal`/`-shm`)**, PII note, purge usage.
+- **Gate:** `docker compose up` builds (no CGO), persists across `down`/`up` with the volume.
+
+## Phase 9 — Verification & close-out
+
+- [ ] **9.1** `test` Full Go suite green: `go test ./...`; confirm ≥80% on new packages.
+- [ ] **9.2** `test` Frontend suite green: `yarn lint && yarn test:unit && yarn build`.
+- [ ] **9.3** `test` Manual E2E in Docker: fresh lookup → restart container → replay from
+  disk (AC4); verify AC1–AC13 checklist in the spec.
+- [ ] **9.4** `chore` Self-review for CRITICAL/HIGH issues (security-reviewer on IP/PII
+  handling + SQL); ensure parameterized queries only.
+- [ ] **9.5** `docs` Flip spec **Status** to `Implemented`; open a PR to `dev` with Summary
+  + Test Plan (mind the 400/800-line size rule — split the PR if needed).
+- **Gate:** all boxes ticked; PR opened.
