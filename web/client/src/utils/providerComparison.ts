@@ -34,9 +34,19 @@ export interface Comparison {
   rows: ComparisonRow[];
 }
 
+import { canonicalCountry } from "./countries";
+
 type Raw = Record<string, unknown>;
 
 const BASELINE_KEY = "local";
+
+// Rows whose values are the same number in different formats — compared on
+// digits alone so "+1 202 867 5309", "+12028675309" and "(202) 867-5309" agree.
+const DIGIT_ROWS = new Set([
+  "international_format",
+  "national_format",
+  "country_prefix",
+]);
 
 // Column order for the providers we know about. Unknown providers are appended
 // in the order they appear in the results map.
@@ -144,7 +154,19 @@ const normaliseProvider = (
 const hasAnyValue = (normalised: { [k: string]: string }): boolean =>
   Object.keys(normalised).some((key) => normalised[key] !== "");
 
-const compareKey = (value: string): string => value.trim().toLowerCase();
+// Reduces a cell value to a canonical key for the disagreement check. The rule
+// depends on the row: number-format rows compare on digits, the country row
+// resolves names/codes to a canonical country, everything else is a trimmed,
+// case-folded string.
+const rowCompareKey = (rowKey: string, value: string): string => {
+  if (DIGIT_ROWS.has(rowKey)) {
+    return value.replace(/\D+/g, "");
+  }
+  if (rowKey === "country_name") {
+    return canonicalCountry(value);
+  }
+  return value.trim().toLowerCase();
+};
 
 // Orders the provider result keys: known providers first (in PROVIDER_ORDER),
 // then any unknown providers in insertion order.
@@ -195,8 +217,15 @@ export function buildComparison(
       return { columnKey: column.key, value, filled: value !== "" };
     });
 
+    // Compare only the providers that returned a value; a provider that omits a
+    // field (e.g. Twilio has no international format) never causes a highlight.
+    // A value that normalises to empty (e.g. a format with no digits) is also
+    // excluded so it can't manufacture a lone mismatch.
     const distinct = new Set(
-      cells.filter((cell) => cell.filled).map((cell) => compareKey(cell.value))
+      cells
+        .filter((cell) => cell.filled)
+        .map((cell) => rowCompareKey(def.key, cell.value))
+        .filter((key) => key !== "")
     );
 
     return {
@@ -214,4 +243,5 @@ export const __test__ = {
   normaliseProvider,
   orderProviders,
   dialPrefix,
+  rowCompareKey,
 };

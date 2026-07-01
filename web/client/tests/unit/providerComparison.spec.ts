@@ -1,4 +1,5 @@
 import { buildComparison, __test__ } from "../../src/utils/providerComparison";
+import { canonicalCountry } from "../../src/utils/countries";
 
 // Realistic-ish fixtures modelled on the actual scanner JSON shapes.
 const numverify = {
@@ -86,6 +87,61 @@ describe("utils/providerComparison", () => {
 
       expect(rowByKey(comparison, "valid")?.disagreement).toBe(false);
       expect(rowByKey(comparison, "line_type")?.disagreement).toBe(false);
+    });
+
+    it("does not flag number-format rows that differ only in punctuation", () => {
+      const comparison = buildComparison(null, {
+        numverify: {
+          valid: true,
+          international_format: "+1 202 867 5309",
+          local_format: "(202) 867-5309",
+          country_prefix: "+1",
+        },
+        veriphone: {
+          valid: true,
+          international_format: "+12028675309",
+          local_format: "202-867-5309",
+          country_prefix: "1",
+        },
+      });
+
+      expect(rowByKey(comparison, "international_format")?.disagreement).toBe(
+        false
+      );
+      expect(rowByKey(comparison, "national_format")?.disagreement).toBe(false);
+      expect(rowByKey(comparison, "country_prefix")?.disagreement).toBe(false);
+    });
+
+    it("treats country name, ISO code and long form as the same country", () => {
+      const comparison = buildComparison(null, {
+        numverify: { valid: true, country_name: "United States" },
+        veriphone: { valid: true, country_name: "United States of America" },
+        numlookupapi: { valid: true, country_name: "USA" },
+      });
+
+      expect(rowByKey(comparison, "country_name")?.disagreement).toBe(false);
+    });
+
+    it("still flags genuinely different countries", () => {
+      const comparison = buildComparison(null, {
+        numverify: { valid: true, country_name: "United States" },
+        veriphone: { valid: true, country_name: "Canada" },
+      });
+
+      expect(rowByKey(comparison, "country_name")?.disagreement).toBe(true);
+    });
+
+    it("does not flag a format row when a provider omits it but the rest agree", () => {
+      const comparison = buildComparison(null, {
+        numverify: { valid: true, international_format: "+1 202 867 5309" },
+        veriphone: { valid: true, international_format: "+12028675309" },
+        // Twilio returns no international format — its empty cell must not flag.
+        twilio: { valid: true, national_format: "(202) 867-5309" },
+      });
+
+      expect(rowByKey(comparison, "international_format")?.disagreement).toBe(
+        false
+      );
     });
 
     it("treats agreement case-insensitively and ignores surrounding space", () => {
@@ -182,6 +238,43 @@ describe("utils/providerComparison", () => {
       expect(__test__.dialPrefix("+44")).toBe("+44");
       expect(__test__.dialPrefix(0)).toBe("");
       expect(__test__.dialPrefix(null)).toBe("");
+    });
+
+    it("reduces number-format rows to digits and leaves other rows folded", () => {
+      expect(__test__.rowCompareKey("international_format", "+1 (202) 8")).toBe(
+        "12028"
+      );
+      expect(__test__.rowCompareKey("country_prefix", "+1")).toBe("1");
+      expect(__test__.rowCompareKey("carrier", "  Verizon Wireless ")).toBe(
+        "verizon wireless"
+      );
+    });
+  });
+
+  describe("canonicalCountry", () => {
+    it("maps codes, short and long forms to one canonical key", () => {
+      const us = canonicalCountry("United States");
+      expect(canonicalCountry("USA")).toBe(us);
+      expect(canonicalCountry("US")).toBe(us);
+      expect(canonicalCountry("United States of America")).toBe(us);
+      expect(canonicalCountry("u.s.a.")).toBe(us);
+    });
+
+    it("distinguishes different countries", () => {
+      expect(canonicalCountry("United Kingdom")).not.toBe(
+        canonicalCountry("United States")
+      );
+    });
+
+    it("falls back to a normalised form for unknown countries", () => {
+      expect(canonicalCountry("  Freedonia ")).toBe(
+        canonicalCountry("freedonia")
+      );
+    });
+
+    it("returns empty string for blank input", () => {
+      expect(canonicalCountry("")).toBe("");
+      expect(canonicalCountry("   ")).toBe("");
     });
   });
 });
