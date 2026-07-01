@@ -17,14 +17,14 @@
 Add a `serpapi` scanner that executes the framework's existing phone-number dorks
 against additional search indices (Bing, DuckDuckGo, Yandex, and Google) through
 SerpAPI, returning result counts and top hits per category. It is the direct
-sibling of the `searxng` and `googlecse` scanners — same dorks, different engines —
+sibling of the `searxng` scanner — same dorks, different engines —
 and reuses the dork generators already defined in `googlesearch_scanner.go` without
 modification.
 
 ## 2. Motivation & gap filled
 
 The footprint side of the tool currently executes dorks through SearXNG
-(self-hosted meta-search) or Google CSE. Different engines index different corners
+(self-hosted meta-search). Different engines index different corners
 of the web, so a number's footprint on Bing or Yandex can differ from Google's. The
 `serpapi` scanner widens coverage with minimal new code because the dork engine is
 already factored out.
@@ -176,5 +176,3 @@ type SearchBackendInterface interface {
 
 - Allow direct engine APIs (Bing Web Search, etc.) as alternative
   `SearchBackendInterface` implementations for operators who already hold those keys.
-- Once the shared dork-execution helper exists, fold `googlecse` onto it as well so
-  all three search scanners share one path.

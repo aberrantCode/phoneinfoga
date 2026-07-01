@@ -220,9 +220,9 @@ describe("Scan.vue", () => {
         scannerAvailability: [
           scanner("numverify", true),
           scanner("searxng", true),
-          scanner("googlecse", false),
+          scanner("abstract", false),
         ],
-        selectedScannerNames: ["numverify", "searxng", "googlecse"],
+        selectedScannerNames: ["numverify", "searxng", "abstract"],
         scannerFailures: { searxng: "rate limited" },
       });
 
