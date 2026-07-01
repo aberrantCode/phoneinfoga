@@ -55,9 +55,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   assigns id/created_at/status=pending; results ordered by started_at; complete vs partial
   close; latest/list newest-first with limit + number scoping; FK cascade. Non-test build
   stays green; store package test compiles GREEN in 1.5.
-- [ ] **1.5** `feat` Implement `web/v2/api/store/sqlite.go` (`sqliteStore`) to GREEN:
+- [x] **1.5** `feat` Implement `web/v2/api/store/sqlite.go` (`sqliteStore`) to GREEN:
   `sql.Open("sqlite", path)`, WAL/busy_timeout/foreign_keys PRAGMAs, `os.MkdirAll`
   on parent dir, embedded migration runner via `PRAGMA user_version`.
+  `*SQLiteStore` (+`Close`, `New`). `SetMaxOpenConns(1)` so per-connection PRAGMAs (FK,
+  busy_timeout) always apply. Parameterized SQL throughout; `user_version` set from the
+  int filename prefix only. Scan/format helpers in `rows.go`. Full RED suite GREEN; store
+  coverage 80.5% (≥80% gate). `ErrLookupNotFound` exported for handler 404s.
 - [ ] **1.6** `feat` `CloseLookup` status math: `complete` if every requested scanner
   has a result row, else `partial`. Cover both in tests.
 - **Gate:** `go test ./web/v2/api/store/...` green; ≥80% coverage on the package.

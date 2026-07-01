@@ -30,7 +30,7 @@ type Lookup struct {
 	Valid             bool            `json:"valid"`
 	RawLocal          string          `json:"rawLocal"`
 	Local             string          `json:"local"`
-	International      string          `json:"international"`
+	International     string          `json:"international"`
 	CountryCode       int32           `json:"countryCode"`
 	Country           string          `json:"country"`
 	Carrier           string          `json:"carrier"`
