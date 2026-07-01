@@ -123,9 +123,12 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `/v2/lookups`, GET `/v2/lookups/latest`, GET `/v2/lookups/:id`. `server_test.go` asserts no
   panic on the static `latest` vs param `:id` siblings (gin 1.9 radix tree handles it) and that
   existing routes remain. Backward compat intact.
-- [ ] **3.7** `test` `lookups_test.go` (`httptest` + injected in-memory store): happy paths,
+- [x] **3.7** `test` `lookups_test.go` (`httptest` + injected in-memory store): happy paths,
   `400` on missing number, `404`s, and **AC10** (no cross-number leakage).
-- **Gate:** `go test ./web/v2/api/...` green.
+  `lookups_integration_test.go` drives `server.NewServer()` end-to-end: create→close→get→latest
+  →list lifecycle, 400 (missing/invalid number), 404s (unknown id, no-data latest), AC10 (list &
+  latest scoped to queried number), and a `/v2/numbers` backward-compat check.
+- **Gate:** ✅ `go test ./web/v2/api/...` green (store, handlers, server, api all pass).
 
 ## Phase 4 — Persist scanner results on run
 
