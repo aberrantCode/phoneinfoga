@@ -93,7 +93,11 @@
       </p>
     </div>
 
-    <b-card v-if="isLookup || showInformations" no-body class="mb-3 mt-3">
+    <b-card
+      v-if="isLookup || showInformations || isResultsState"
+      no-body
+      class="mb-3 mt-3"
+    >
       <b-card-header
         class="bg-white results-section-header"
         @click="informationExpanded = !informationExpanded"
@@ -119,6 +123,21 @@
             >
               <span class="metadata-label">{{ item.label }}</span>
               <span class="metadata-value">{{ item.value }}</span>
+            </div>
+          </div>
+
+          <!-- Request/results record (AC5): time, client IP, scanners, status. -->
+          <div v-if="lookupRecordItems.length" class="metadata-record mt-3">
+            <h3 class="metadata-record-title text-left">Request record</h3>
+            <div class="metadata-grid">
+              <div
+                v-for="item in lookupRecordItems"
+                :key="item.label"
+                class="metadata-item text-left"
+              >
+                <span class="metadata-label">{{ item.label }}</span>
+                <span class="metadata-value">{{ item.value }}</span>
+              </div>
             </div>
           </div>
         </b-card-body>
@@ -250,6 +269,19 @@ import Scanner from "../components/Scanner.vue";
 import ProviderComparison from "../components/ProviderComparison.vue";
 import axios, { AxiosResponse } from "axios";
 import config from "@/config";
+
+// Renders an RFC3339 timestamp in the viewer's locale, falling back to the raw
+// value if it can't be parsed.
+const formatTimestamp = (iso: string): string => {
+  if (!iso) {
+    return "";
+  }
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+};
+
+const titleCase = (value: string): string =>
+  value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
 
 // Scanners whose results share the validation-field vocabulary and therefore
 // belong in the provider-comparison matrix.
@@ -394,6 +426,26 @@ export default Vue.extend({
       return (
         this.viewState.state === "results" && this.viewState.source === "replay"
       );
+    },
+    // The request/results record shown alongside the number metadata (AC5): when a
+    // lookup is active, surface its time, client IP, requested scanners and status.
+    lookupRecordItems(): Array<{ label: string; value: string }> {
+      const lookup = this.viewState.activeLookup;
+      if (!lookup) {
+        return [];
+      }
+
+      const items = [
+        { label: "Lookup time", value: formatTimestamp(lookup.createdAt) },
+        { label: "Client IP", value: lookup.clientIp || "" },
+        {
+          label: "Scanners requested",
+          value: (lookup.scannersRequested || []).join(", "),
+        },
+        { label: "Status", value: titleCase(lookup.status) },
+      ];
+
+      return items.filter((item) => item.value !== "");
     },
     metadataItems(): Array<{ label: string; value: string }> {
       const items = [
@@ -803,6 +855,14 @@ export default Vue.extend({
 
 .metadata-value {
   overflow-wrap: anywhere;
+}
+
+.metadata-record-title {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
 }
 
 .scan-status-list {

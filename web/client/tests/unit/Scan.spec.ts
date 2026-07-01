@@ -342,6 +342,44 @@ describe("Scan.vue", () => {
     });
   });
 
+  describe("request record in metadata panel (AC5)", () => {
+    it("derives the lookup record fields from the active lookup", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", {
+        id: "lk-1",
+        status: "complete",
+        createdAt: "2026-07-01T10:00:00Z",
+        clientIp: "203.0.113.7",
+        scannersRequested: ["local", "numverify"],
+        results: [],
+      });
+
+      const record = wrapper.vm.lookupRecordItems as Array<{
+        label: string;
+        value: string;
+      }>;
+      const byLabel = Object.fromEntries(record.map((i) => [i.label, i.value]));
+
+      expect(Object.keys(byLabel)).toEqual(
+        expect.arrayContaining([
+          "Lookup time",
+          "Client IP",
+          "Scanners requested",
+          "Status",
+        ])
+      );
+      expect(byLabel["Client IP"]).toBe("203.0.113.7");
+      expect(byLabel["Scanners requested"]).toBe("local, numverify");
+      expect(byLabel["Status"]).toBe("Complete");
+      expect(byLabel["Lookup time"]).toBeTruthy();
+    });
+
+    it("has no record items in the entry state", () => {
+      const { wrapper } = mountScan();
+      expect(wrapper.vm.lookupRecordItems).toEqual([]);
+    });
+  });
+
   describe("results-state input hiding (AC6)", () => {
     it("shows the phone input in entry state and hides it in results state", async () => {
       const { wrapper } = mountScan();

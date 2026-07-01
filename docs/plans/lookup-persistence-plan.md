@@ -180,8 +180,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   Entry form gated on `!isResultsState`; a **Start over** button (shown when `isResultsState`)
   calls `startOver()` → `clearData` + clears the input fields. Non-breaking (nothing enters
   results state until 6.3). Scan.spec asserts input hidden in results + Start over resets.
-- [ ] **6.2** `feat` Extend the metadata panel to show request/results record: lookup time,
+- [x] **6.2** `feat` Extend the metadata panel to show request/results record: lookup time,
   client IP, scanners requested, overall status (AC5) — alongside existing number metadata.
+  `lookupRecordItems` computed derives time/IP/scanners/status from `viewState.activeLookup`
+  (empty in entry). New "Request record" sub-panel inside the Metadata card; card now also
+  renders in results state. Scan.spec covers the computed. Lint + 74 tests + build green.
 - [ ] **6.3** `feat` Fresh-lookup orchestration: `createLookup` → per-scanner runs with
   `lookupId` → `closeLookup` → enter `results/fresh` (AC1–AC3 end-to-end via UI).
 - [ ] **6.4** `test` Component test: results state hides input + shows Start over; metadata
