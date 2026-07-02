@@ -519,4 +519,42 @@ describe("Scan.vue", () => {
       expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(true);
     });
   });
+
+  describe("results-state rendering (AC5 + AC6)", () => {
+    it("renders the request record fields, hides the input and shows Start over", async () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", {
+        id: "lk-1",
+        status: "complete",
+        createdAt: "2026-07-01T10:00:00Z",
+        completedAt: "2026-07-01T10:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local", "numverify"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [],
+      });
+      await wrapper.vm.$nextTick();
+
+      const text = wrapper.text();
+      // Request record fields (AC5).
+      expect(text).toContain("Request record");
+      expect(text).toContain("203.0.113.7");
+      expect(text).toContain("Complete");
+      expect(text).toContain("local, numverify");
+
+      // Input hidden, Start over shown (AC6).
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(false);
+      expect(text).toContain("Start over");
+    });
+  });
 });

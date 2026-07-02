@@ -192,9 +192,13 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `maybeCloseLookup` finalizes once (a `lookupClosed` latch) when every scanner settles.
   createLookup/closeLookup failures are non-fatal. Scan.spec: create→fresh, close-on-settle,
   non-fatal. 77 tests + lint + build green.
-- [ ] **6.4** `test` Component test: results state hides input + shows Start over; metadata
+- [x] **6.4** `test` Component test: results state hides input + shows Start over; metadata
   panel shows the record fields.
-- **Gate:** manual fresh lookup persists and renders; `yarn test:unit` green.
+  DOM test enters `results/replay` and asserts the rendered output contains "Request record",
+  the client IP, status ("Complete") and joined scanners, that `VuePhoneNumberInput` is absent,
+  and that "Start over" is shown.
+- **Gate:** ✅ `yarn test:unit` green (78 tests); fresh lookup persists+renders (6.3 covered);
+  lint + build green.
 
 ## Phase 7 — Replay, Run new lookup, Previous lookups dropdown
 
