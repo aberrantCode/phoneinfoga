@@ -256,7 +256,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 9 — Verification & close-out
 
-- [ ] **9.1** `test` Full Go suite green: `go test ./...`; confirm ≥80% on new packages.
+- [x] **9.1** `test` Full Go suite green: `go test ./...`; confirm ≥80% on new packages.
+  `CGO_ENABLED=0 go test ./...` all green (incl. `examples/plugin`). Coverage: store **80.5%**;
+  new handler code in handlers pkg 94.6%; new `cmd/serve_store.go` 100%/87.5% (`resolveDBPath`/
+  `setupStore`). (`-race` skipped locally: no gcc on this Windows box; CI runs it on Linux.)
 - [ ] **9.2** `test` Frontend suite green: `yarn lint && yarn test:unit && yarn build`.
 - [ ] **9.3** `test` Manual E2E in Docker: fresh lookup → restart container → replay from
   disk (AC4); verify AC1–AC13 checklist in the spec.
