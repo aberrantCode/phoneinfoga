@@ -61,6 +61,7 @@ The three validation scanners share one `ValidationProvider` supplier interface 
 - Range/rate-center allocation for +1 (NANPA) and select EU countries (OVH)
 - Redundant validation across Numverify, Veriphone, Abstract and NumlookupAPI
 - Run scans from the browser GUI, or programmatically via the [REST API](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/sundowndev/phoneinfoga/master/web/docs/swagger.yaml) and [Go modules](https://pkg.go.dev/github.com/sundowndev/phoneinfoga/v2)
+- **Lookup persistence & history**: every web lookup is saved to an embedded SQLite database so returning to a number replays the last result without re-scanning (see below)
 
 ## Quick start
 
@@ -73,6 +74,50 @@ phoneinfoga serve
 ```
 
 Every scanner is skipped cleanly when its credentials are absent, so you can start with none configured and enable providers incrementally. See [`.env.example`](./.env.example) for the full, annotated list of environment variables and [`docs/features/`](./docs/features/) for the design spec behind each scanner.
+
+## Self-hosting: lookup persistence
+
+When you run `phoneinfoga serve`, every lookup made from the web UI is persisted to an
+embedded [SQLite](https://sqlite.org) database (pure-Go driver — no CGO, no extra services).
+Returning to a number you've looked up before **replays the most recent stored result without
+re-running the scanners**, and a per-number **Previous lookups** dropdown opens any past lookup
+in full detail. The CLI `scan` command is unaffected — persistence is web-only.
+
+**Database path.** Set `PHONEINFOGA_DB_PATH` to choose the file (default `./phoneinfoga.db`).
+The parent directory is created automatically on startup. Persistence is always on for `serve`;
+if the database can't be opened or migrated, `serve` exits with an error.
+
+**Docker.** The provided [`support/docker/docker-compose.yml`](./support/docker/docker-compose.yml)
+sets `PHONEINFOGA_DB_PATH=/app/data/phoneinfoga.db` and bind-mounts `./data:/app/data`, so lookups
+survive `docker compose down`/`up`:
+
+```bash
+cd support/docker
+docker compose up -d      # creates ./data/phoneinfoga.db, persisted across restarts
+```
+
+**Backup.** To back up, copy the **entire `./data` directory** while the service is stopped (or
+at least copy the `.db` file **together with its `-wal` and `-shm` sidecar files** — the WAL may
+hold committed data not yet folded into the main file):
+
+```bash
+cp -a support/docker/data /path/to/backup/   # or back up $PHONEINFOGA_DB_PATH and its -wal/-shm
+```
+
+**Privacy / PII.** Records include the **client IP**, **User-Agent** and the **phone numbers**
+looked up, and are retained **indefinitely** by design. Treat the database as personal data. To
+enforce a retention window, run the purge script (deletes lookups older than N days — 30 by
+default — and their scanner results, then `VACUUM`s; it's idempotent):
+
+```bash
+# delete records older than 30 days
+PHONEINFOGA_DB_PATH=./phoneinfoga.db support/scripts/purge-lookups.sh
+
+# or a custom window (e.g. 7 days) — needs the sqlite3 CLI
+support/scripts/purge-lookups.sh 7
+```
+
+Schedule it (e.g. via cron) if you want automatic pruning.
 
 ## Anti-features
 

@@ -245,9 +245,14 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `julianday(created_at) < julianday('now','-N days')` and `PRAGMA foreign_keys=ON` so
   `scanner_results` cascade. Guards: integer validation, missing sqlite3/db/table → no-op exit 0.
   SQL verified via the pure-Go driver (old row + its result deleted, recent row kept). Executable.
-- [ ] **8.4** `docs` README self-hosting section: DB path, volume mount, **backup = copy
+- [x] **8.4** `docs` README self-hosting section: DB path, volume mount, **backup = copy
   `./data` (incl. `-wal`/`-shm`)**, PII note, purge usage.
-- **Gate:** `docker compose up` builds (no CGO), persists across `down`/`up` with the volume.
+  Added a "Self-hosting: lookup persistence" section (DB path, Docker volume, backup incl.
+  `-wal`/`-shm`, PII/retention, purge usage) + a Features bullet. Fixed a pre-existing
+  compose `dockerfile:` path bug (`../../Dockerfile` → `Dockerfile`, relative to context)
+  so `docker compose build` works.
+- **Gate:** ✅ `docker compose build` succeeds — full no-CGO multi-stage image built
+  (pure-Go modernc, alpine runtime). Live persist-across-`down`/`up` E2E is covered by 9.3.
 
 ## Phase 9 — Verification & close-out
 
