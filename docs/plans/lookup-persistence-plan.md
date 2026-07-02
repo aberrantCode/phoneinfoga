@@ -282,6 +282,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   (`maxListLimit=100`, store-level + tested) and an explicit exposure/deployment note in README +
   spec §9 (keep off untrusted networks, schedule purge). A rate limiter is intentionally not
   added (out of scope for the no-auth single-user design); residual risk consciously accepted.
-- [ ] **9.5** `docs` Flip spec **Status** to `Implemented`; open a PR to `dev` with Summary
+- [x] **9.5** `docs` Flip spec **Status** to `Implemented`; open a PR to `dev` with Summary
   + Test Plan (mind the 400/800-line size rule — split the PR if needed).
-- **Gate:** all boxes ticked; PR opened.
+  Spec Status → Implemented. Branch `feat/provider-comparison-matrix` pushed (clean FF ahead of
+  `origin/dev`, no rebase needed); PR #26 opened → `dev` with Summary + Test Plan. Size note in
+  the PR: the branch is stacked on the unmerged provider-comparison work (~5.7k lines total,
+  persistence ~4.4k) — a cohesive TDD feature that doesn't split cleanly; flagged for reviewers.
+- **Gate:** ✅ all boxes ticked; PR #26 opened to `dev` (https://github.com/aberrantCode/phoneinfoga/pull/26).
