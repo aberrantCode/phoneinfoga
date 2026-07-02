@@ -260,7 +260,8 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `CGO_ENABLED=0 go test ./...` all green (incl. `examples/plugin`). Coverage: store **80.5%**;
   new handler code in handlers pkg 94.6%; new `cmd/serve_store.go` 100%/87.5% (`resolveDBPath`/
   `setupStore`). (`-race` skipped locally: no gcc on this Windows box; CI runs it on Linux.)
-- [ ] **9.2** `test` Frontend suite green: `yarn lint && yarn test:unit && yarn build`.
+- [x] **9.2** `test` Frontend suite green: `yarn lint && yarn test:unit && yarn build`.
+  `yarn lint` clean, `yarn test:unit` 87/87 across 8 suites, `yarn build` produces dist. All green.
 - [ ] **9.3** `test` Manual E2E in Docker: fresh lookup → restart container → replay from
   disk (AC4); verify AC1–AC13 checklist in the spec.
 - [ ] **9.4** `chore` Self-review for CRITICAL/HIGH issues (security-reviewer on IP/PII
