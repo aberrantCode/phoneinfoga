@@ -236,7 +236,9 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `PHONEINFOGA_DB_PATH=/app/data/phoneinfoga.db` env + `./data:/app/data` volume.
   Added the env + `./data:/app/data` bind mount; `docker compose config` validates. Also
   gitignored `*.db`/`-wal`/`-shm` and `support/docker/data/` so runtime DB files aren't committed.
-- [ ] **8.2** `chore` `.env.example`: document `PHONEINFOGA_DB_PATH`.
+- [x] **8.2** `chore` `.env.example`: document `PHONEINFOGA_DB_PATH`.
+  Added a "Lookup persistence" section documenting the env, its defaults (local vs Docker),
+  backup guidance (copy DB + `-wal`/`-shm`), the PII/retention note, and the purge script pointer.
 - [ ] **8.3** `feat` `support/scripts/purge-lookups.sh`: delete records older than N days
   (arg/env) and `VACUUM`. Idempotent.
 - [ ] **8.4** `docs` README self-hosting section: DB path, volume mount, **backup = copy
