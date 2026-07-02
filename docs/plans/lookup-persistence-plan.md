@@ -218,7 +218,9 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `b-dropdown` in the replay controls loads `listLookups(number)` on `@show`; each item's
   `@click` runs `openPreviousLookup(id)` → `getLookup` → `resetResultsState` + `replayLookup`
   (no scans). `previousLookupLabel` = time + status. Scan.spec: loads-on-open + open→replay.
-- [ ] **7.4** `feat` Replay banner ("Showing your most recent lookup from &lt;time&gt;").
+- [x] **7.4** `feat` Replay banner ("Showing your most recent lookup from &lt;time&gt;").
+  `replayBannerText` computed (empty unless `isReplay`) renders a `b-alert` with the localized
+  `createdAt`. Scan.spec: banner shown in replay, absent in fresh.
 - [ ] **7.5** `test` Component tests: entry→replay on 200 (**assert no `/run` calls**),
   entry→fresh on 404, Run new lookup re-scans, dropdown loads detail (AC7–AC9).
 - **Gate:** `yarn test:unit` green; manual replay path shows results without re-scanning.

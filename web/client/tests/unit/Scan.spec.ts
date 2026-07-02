@@ -657,6 +657,44 @@ describe("Scan.vue", () => {
     });
   });
 
+  describe("replay banner", () => {
+    it("shows the replay banner with the lookup time in replay mode", async () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", {
+        id: "lk-1",
+        status: "complete",
+        createdAt: "2026-07-01T10:00:00Z",
+        completedAt: null,
+        clientIp: "",
+        userAgent: "",
+        scannersRequested: [],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [],
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.replayBannerText).toContain(
+        "Showing your most recent lookup from"
+      );
+      expect(wrapper.text()).toContain("Showing your most recent lookup from");
+    });
+
+    it("has no banner in the fresh results state", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("fresh");
+      expect(wrapper.vm.replayBannerText).toBe("");
+    });
+  });
+
   describe("request record in metadata panel (AC5)", () => {
     it("derives the lookup record fields from the active lookup", () => {
       const { wrapper } = mountScan();

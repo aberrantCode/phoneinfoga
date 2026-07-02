@@ -75,6 +75,15 @@
       </b-button>
     </div>
 
+    <b-alert
+      v-if="replayBannerText"
+      show
+      variant="info"
+      class="replay-banner mt-3 mb-0"
+    >
+      {{ replayBannerText }}
+    </b-alert>
+
     <div v-if="!isLookup && inputNumberValid" class="scanner-selector">
       <div class="scanner-selector-toolbar">
         <span class="scanner-selector-label">Scanners:</span>
@@ -476,6 +485,16 @@ export default Vue.extend({
       return (
         this.viewState.state === "results" && this.viewState.source === "replay"
       );
+    },
+    // Replay banner text (spec §8): identifies that the shown results were loaded from
+    // history rather than freshly scanned. Empty in the fresh results / entry states.
+    replayBannerText(): string {
+      const lookup = this.viewState.activeLookup;
+      if (!this.isReplay || !lookup) {
+        return "";
+      }
+      const time = formatTimestamp(lookup.createdAt) || lookup.createdAt;
+      return `Showing your most recent lookup from ${time}.`;
     },
     // The request/results record shown alongside the number metadata (AC5): when a
     // lookup is active, surface its time, client IP, requested scanners and status.
