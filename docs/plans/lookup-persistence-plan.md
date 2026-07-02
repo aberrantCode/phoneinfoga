@@ -239,8 +239,12 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 - [x] **8.2** `chore` `.env.example`: document `PHONEINFOGA_DB_PATH`.
   Added a "Lookup persistence" section documenting the env, its defaults (local vs Docker),
   backup guidance (copy DB + `-wal`/`-shm`), the PII/retention note, and the purge script pointer.
-- [ ] **8.3** `feat` `support/scripts/purge-lookups.sh`: delete records older than N days
+- [x] **8.3** `feat` `support/scripts/purge-lookups.sh`: delete records older than N days
   (arg/env) and `VACUUM`. Idempotent.
+  Days via arg or `PHONEINFOGA_PURGE_DAYS` (default 30); DB via `PHONEINFOGA_DB_PATH`. Uses
+  `julianday(created_at) < julianday('now','-N days')` and `PRAGMA foreign_keys=ON` so
+  `scanner_results` cascade. Guards: integer validation, missing sqlite3/db/table → no-op exit 0.
+  SQL verified via the pure-Go driver (old row + its result deleted, recent row kept). Executable.
 - [ ] **8.4** `docs` README self-hosting section: DB path, volume mount, **backup = copy
   `./data` (incl. `-wal`/`-shm`)**, PII note, purge usage.
 - **Gate:** `docker compose up` builds (no CGO), persists across `down`/`up` with the volume.
