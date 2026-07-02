@@ -46,6 +46,31 @@ describe("Scanner.vue", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  describe("replay mode (AC7)", () => {
+    it("renders a stored success result with no dryrun or run request", async () => {
+      const wrapper = mountScanner({
+        replay: true,
+        replayResult: { status: "success", raw: { info: "stored" } },
+      });
+      await wrapper.vm.$nextTick();
+
+      // The whole point of replay: no network at all (no /dryrun, no /run).
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(wrapper.vm.data).toEqual({ info: "stored" });
+    });
+
+    it("shows a stored error result without scanning", async () => {
+      const wrapper = mountScanner({
+        replay: true,
+        replayResult: { status: "error", errorMessage: "quota exceeded" },
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(wrapper.vm.error).toBe("quota exceeded");
+    });
+  });
+
   describe("runScan lookupId threading", () => {
     const runBodyOf = (): Record<string, unknown> | undefined => {
       const call = mockedAxios.post.mock.calls.find((c) =>

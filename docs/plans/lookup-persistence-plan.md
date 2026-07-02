@@ -221,9 +221,14 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 - [x] **7.4** `feat` Replay banner ("Showing your most recent lookup from &lt;time&gt;").
   `replayBannerText` computed (empty unless `isReplay`) renders a `b-alert` with the localized
   `createdAt`. Scan.spec: banner shown in replay, absent in fresh.
-- [ ] **7.5** `test` Component tests: entry→replay on 200 (**assert no `/run` calls**),
+- [x] **7.5** `test` Component tests: entry→replay on 200 (**assert no `/run` calls**),
   entry→fresh on 404, Run new lookup re-scans, dropdown loads detail (AC7–AC9).
-- **Gate:** `yarn test:unit` green; manual replay path shows results without re-scanning.
+  Scan.spec covers entry→replay (no createLookup/axios.post), entry→fresh (404), Run new lookup
+  (AC8), dropdown load+open→replay (AC9). Added Scanner.spec replay tests that mount a real
+  Scanner in replay and assert **zero** axios calls (no dryrun/run) for success and error —
+  the faithful "no `/run` calls" guarantee.
+- **Gate:** ✅ `yarn test:unit` green (87 tests); replay shows results without re-scanning; lint
+  + build green.
 
 ## Phase 8 — Docker, purge script, docs
 
