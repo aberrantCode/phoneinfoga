@@ -1,0 +1,291 @@
+# Implementation Plan — Lookup Persistence & History
+
+**Spec:** [`docs/features/lookup-persistence.md`](../features/lookup-persistence.md)
+**Branch:** work on the current feature branch (or `feat/lookup-persistence` off `dev`).
+
+## How to use this checklist
+
+- Tasks are ordered; earlier phases unblock later ones. Do them **top to bottom**.
+- Each task is small, independently testable, and **must not break the build**.
+- Follow repo rules: **TDD** (write the failing test first), immutability, many small
+  files, comprehensive error handling, no `console.log`, no hardcoded values.
+- After a task passes: tick its box `[x]`, then make **one atomic conventional commit**
+  scoped to that task.
+- A phase's **Gate** must be green before moving on.
+
+Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
+
+---
+
+## Phase 0 — Scaffolding & dependencies
+
+- [x] **0.1** `chore` Add `modernc.org/sqlite` to `go.mod`; run `go mod tidy`. Verify it
+  resolves with **no CGO** (`go build ./...` on a clean env). *(go.mod, go.sum)*
+  Pinned `v1.28.0` (keeps the `go 1.20` directive; latest requires Go 1.23+). Anchored via a
+  blank driver import in `web/v2/api/store/driver.go` so `go mod tidy` retains it. Pre-existing
+  `examples/plugin` build error (`-buildmode=plugin` example, no `main`) is unrelated.
+- [x] **0.2** `chore` Create empty package dirs: `web/v2/api/store/` and
+  `web/v2/api/store/migrations/`. Add a package doc comment.
+  Added `store/doc.go` (package doc comment) and `store/migrations/.gitkeep` (git can't
+  track empty dirs; SQL migrations land here in task 1.3).
+- **Gate:** ✅ `go build` passes for all real packages; `modernc.org/sqlite` present; no CGO
+  (`CGO_ENABLED=0` build clean). Pre-existing `examples/plugin` `-buildmode=plugin` error is
+  out of scope (real build target is `.`, not `./...`).
+
+## Phase 1 — Store package (TDD)
+
+- [x] **1.1** `feat` Add `web/v2/api/store/models.go` — `Lookup` and `ScannerResult`
+  structs (fields per spec §5), `Store` interface (spec §6), status constants.
+  `CompletedAt *time.Time` (nullable), `RawResponse json.RawMessage` (verbatim), status
+  consts `Status*`/`ResultStatus*`. `models_test.go` asserts constant values + hydration.
+- [x] **1.2** `feat` Add UUIDv4 helper `web/v2/api/store/id.go` using `crypto/rand`
+  (no new dependency) + a unit test asserting format/uniqueness.
+  `NewUUID()` sets RFC 4122 version/variant bits; tests assert canonical v4 regex + 1000
+  unique ids. Package coverage 83.3%.
+- [x] **1.3** `feat` Add migration `web/v2/api/store/migrations/0001_init.sql` (both
+  tables + indexes per spec §5). Embed via `embed.FS`.
+  `migrations.go` embeds `migrations/*.sql`; test applies the SQL to an in-memory DB and
+  asserts both tables + all three indexes exist. Removed the now-redundant `.gitkeep`.
+- [x] **1.4** `test` Write `store_test.go` (RED): open temp-file DB → `Migrate` →
+  `CreateLookup` → `SaveScannerResult` (success + error rows) → `CloseLookup` →
+  `GetLookup`/`GetLatestLookupByNumber`/`ListLookupsByNumber`. Assert ordering,
+  hydration, cascade delete, upsert on duplicate `(lookup_id, scanner)`, and
+  `Migrate` idempotency.
+  RED as intended — references `New`/`*SQLiteStore` (undefined until 1.5). Contract: store
+  assigns id/created_at/status=pending; results ordered by started_at; complete vs partial
+  close; latest/list newest-first with limit + number scoping; FK cascade. Non-test build
+  stays green; store package test compiles GREEN in 1.5.
+- [x] **1.5** `feat` Implement `web/v2/api/store/sqlite.go` (`sqliteStore`) to GREEN:
+  `sql.Open("sqlite", path)`, WAL/busy_timeout/foreign_keys PRAGMAs, `os.MkdirAll`
+  on parent dir, embedded migration runner via `PRAGMA user_version`.
+  `*SQLiteStore` (+`Close`, `New`). `SetMaxOpenConns(1)` so per-connection PRAGMAs (FK,
+  busy_timeout) always apply. Parameterized SQL throughout; `user_version` set from the
+  int filename prefix only. Scan/format helpers in `rows.go`. Full RED suite GREEN; store
+  coverage 80.5% (≥80% gate). `ErrLookupNotFound` exported for handler 404s.
+- [x] **1.6** `feat` `CloseLookup` status math: `complete` if every requested scanner
+  has a result row, else `partial`. Cover both in tests.
+  Membership-set logic (not row count): complete/partial + edge case where an unrequested
+  extra result must not mask a missing requested scanner. All three branches covered.
+- **Gate:** ✅ `go test ./web/v2/api/store/...` green; package coverage 80.5% (≥80%).
+
+## Phase 2 — Config & serve wiring
+
+- [x] **2.1** `feat` Add `handlers.InitStore(store)` + package var `Store` in
+  `web/v2/api/handlers/init.go` (mirror `RemoteLibrary` pattern).
+  `Store store.Store` (nil when unconfigured — CLI/tests); `InitStore` is a plain setter
+  (no `sync.Once`) so tests can re-inject. Persistence-aware handlers must nil-check it.
+- [x] **2.2** `feat` Resolve `PHONEINFOGA_DB_PATH` (default `./phoneinfoga.db`) in
+  `cmd/serve.go` `PreRun`; open store, `Migrate()`, `handlers.InitStore(store)`;
+  `exitWithError` on failure.
+  Extracted testable `resolveDBPath`/`setupStore` (`cmd/serve_store.go`); PreRun calls
+  `exitWithError` on failure. Smoke-verified: `serve` boots, creates the DB (+parent dir,
+  WAL files), `user_version=1`, both tables present. Automated assertion follows in 2.3.
+- [x] **2.3** `test` Add a serve-wiring test (or extend existing) asserting `handlers.Store`
+  is non-nil after init with a temp path.
+  `cmd/serve_store_test.go`: `setupStore(temp)` injects a non-nil `handlers.Store` and creates
+  the DB file (+parent dir); default/env path resolution; open-error path. New-code coverage
+  `resolveDBPath` 100%, `setupStore` 87.5%.
+- **Gate:** ✅ `phoneinfoga serve` boots, creates the DB file, and migrates cleanly (live smoke
+  test in 2.2 + automated `setupStore` test in 2.3).
+
+## Phase 3 — Lookup lifecycle + read API (TDD)
+
+- [x] **3.1** `feat` `web/v2/api/handlers/lookups.go` — `POST /v2/lookups`:
+  validate number, build metadata (reuse `number.NewNumber`), capture
+  `ctx.ClientIP()` + `User-Agent`, `CreateLookup(status=pending)`, return
+  `{id, number, scannersRequested, clientIp, createdAt, status}`.
+  `CreateLookup` handler + `CreateLookupInput`/`CreateLookupResponse`; nil-store guard (500);
+  `number` built-in validator → 400 on bad input. Handler-level tests (direct gin.Context):
+  happy/persisted (AC1), invalid number, nil store. Route registered in 3.6. Handler 80%,
+  pkg 95.2%.
+- [x] **3.2** `feat` `POST /v2/lookups/:id/close` → `CloseLookup`; return summary; `404`
+  if unknown id.
+  `CloseLookup` handler + `CloseLookupResponse` summary (id/status/scannersRequested/created/
+  completed); `errors.Is(err, store.ErrLookupNotFound)` → 404; nil-store → 500. Tests: complete
+  close, 404, nil store. Route registered in 3.6. Pkg coverage 94.4%.
+- [x] **3.3** `feat` `GET /v2/lookups/:id` → full detail (spec §7); `404` if missing.
+  `GetLookup` handler + shared `lookup_detail.go` projection (`LookupDetailResponse`,
+  `lookupDetail`); `raw` field emits verbatim payload / JSON `null` for errors (no omitempty).
+  `nil` result → 404, nil store → 500. Tests: full detail + ordering, 404, nil store. Route
+  in 3.6. Pkg coverage 94.1%.
+- [x] **3.4** `feat` `GET /v2/lookups/latest?number=` → newest for number, full detail;
+  `400` if `number` missing, `404` if none.
+  `GetLatestLookup` handler + shared `e164FromQuery` (normalizes via `number.NewNumber`, 400 on
+  missing/invalid). Reuses `lookupDetail`. Tests: newest returned, missing/invalid number → 400,
+  none → 404, nil store → 500. Route in 3.6. Pkg coverage 94.2%.
+- [x] **3.5** `feat` `GET /v2/lookups?number=&limit=` → per-number summaries newest-first;
+  `400` if `number` missing; never returns other numbers.
+  `ListLookups` handler + `LookupSummary`/`ListLookupsResponse` (no results); `listLimit` parses
+  optional `limit` (0 → store default). Tests: ordering+limit, AC10 number-scoping, missing
+  number → 400, nil store → 500. Route in 3.6. Pkg coverage 94.1%.
+- [x] **3.6** `feat` Register all five routes in `web/v2/api/server/server.go`.
+  Registered via `api.WrapHandler`: POST `/v2/lookups`, POST `/v2/lookups/:id/close`, GET
+  `/v2/lookups`, GET `/v2/lookups/latest`, GET `/v2/lookups/:id`. `server_test.go` asserts no
+  panic on the static `latest` vs param `:id` siblings (gin 1.9 radix tree handles it) and that
+  existing routes remain. Backward compat intact.
+- [x] **3.7** `test` `lookups_test.go` (`httptest` + injected in-memory store): happy paths,
+  `400` on missing number, `404`s, and **AC10** (no cross-number leakage).
+  `lookups_integration_test.go` drives `server.NewServer()` end-to-end: create→close→get→latest
+  →list lifecycle, 400 (missing/invalid number), 404s (unknown id, no-data latest), AC10 (list &
+  latest scoped to queried number), and a `/v2/numbers` backward-compat check.
+- **Gate:** ✅ `go test ./web/v2/api/...` green (store, handlers, server, api all pass).
+
+## Phase 4 — Persist scanner results on run
+
+- [x] **4.1** `test` Extend `scanners_test.go` (RED): `POST /run` with `lookupId` writes a
+  `scanner_results` row (success **and** error cases); **without** `lookupId` writes
+  nothing (backward compat, AC13).
+  `run_persist_test.go` (RED) drives `/run` through the router: success persists a verbatim
+  raw row, scanner error persists an error row (response still 500, unchanged), and no
+  `lookupId` persists nothing. Intentionally RED — references `RunScannerInput.LookupID`
+  (added in 4.2). Non-test build stays green.
+- [x] **4.2** `feat` Add optional `LookupId` to `RunScannerInput`; in `RunScanner`, time the
+  run and — when `lookupId` present — `SaveScannerResult` (raw verbatim, status/message,
+  timing). Persist errors too.
+  `RunScannerInput.LookupID` (`json:"lookupId"`); `persistScannerResult` helper (best-effort,
+  guarded on nil store / empty id). Times around `scanner.Run`; success persists
+  `json.Marshal(result)` verbatim, error persists status+message. RED suite GREEN; existing
+  RunScanner tests unchanged (AC13). `RunScanner`/`persistScannerResult` 100% coverage.
+- [x] **4.3** `feat` Make persistence non-fatal: on store error, log warn and still return
+  the scan result (spec §7).
+  `persistScannerResult` now logs a `logrus.Warn` (lookupId+scanner fields) on
+  `SaveScannerResult` error instead of silently swallowing; the scan result is returned
+  regardless. Regression test forces an FK violation (lookupId with no parent row) and asserts
+  `/run` still returns 200. `persistScannerResult` 100% coverage (both branches).
+- **Gate:** ✅ `go test ./web/v2/api/...` green; AC1–AC3, AC13 covered.
+
+## Phase 5 — Frontend API client & state model
+
+- [x] **5.1** `feat` Add lookup API calls to `web/client/src/utils/index.ts`:
+  `createLookup`, `closeLookup`, `getLookup`, `getLatestLookup`, `listLookups`.
+  Typed client + `LookupDetail`/`LookupSummary`/etc. interfaces. `getLatestLookup` uses
+  `validateStatus` to return `null` on 404 (for the replay-vs-fresh branch in 7.1). 6 Jest
+  tests (axios mocked). Lint clean, `yarn build` + full 64-test suite green.
+- [x] **5.2** `feat` Thread optional `lookupId` through the existing per-scanner `run`
+  call (Scanner.vue / utils) without changing behavior when absent.
+  Added `@Prop lookupId` (default `""`) to `Scanner.vue`; `runScan` adds `lookupId` to the POST
+  body only when non-empty (request identical to today when absent — AC13). Scanner.spec tests
+  both branches (stubbing `CancelToken.source`). Lint + 66-test suite + build green.
+- [x] **5.3** `feat` Introduce a `viewState` model in `Scan.vue`
+  (`entry | results`, source `fresh | replay`, `activeLookup`).
+  `viewState: {state, source, activeLookup}` + computed `isEntryState`/`isResultsState`/
+  `isReplay` + `enterResults`/`enterEntry` transitions; `clearData` calls `enterEntry`. Template
+  still keyed on `isLookup` (Phase 6 migrates it). Scan.spec covers the transitions.
+- **Gate:** ✅ `yarn build` succeeds; lint clean; existing UI unchanged (70-test suite green).
+
+## Phase 6 — Results state, metadata panel, Start over
+
+- [x] **6.1** `feat` In results state, **hide** the phone-number field, country selector,
+  and Lookup button; render a **Start over** control that resets to entry (AC6).
+  Entry form gated on `!isResultsState`; a **Start over** button (shown when `isResultsState`)
+  calls `startOver()` → `clearData` + clears the input fields. Non-breaking (nothing enters
+  results state until 6.3). Scan.spec asserts input hidden in results + Start over resets.
+- [x] **6.2** `feat` Extend the metadata panel to show request/results record: lookup time,
+  client IP, scanners requested, overall status (AC5) — alongside existing number metadata.
+  `lookupRecordItems` computed derives time/IP/scanners/status from `viewState.activeLookup`
+  (empty in entry). New "Request record" sub-panel inside the Metadata card; card now also
+  renders in results state. Scan.spec covers the computed. Lint + 74 tests + build green.
+- [x] **6.3** `feat` Fresh-lookup orchestration: `createLookup` → per-scanner runs with
+  `lookupId` → `closeLookup` → enter `results/fresh` (AC1–AC3 end-to-end via UI).
+  `startFreshLookup` builds the scanner list, `createLookup`s (before scanners mount), sets
+  `activeLookupId` (bound to `<Scanner :lookup-id>`) and enters `results/fresh`;
+  `maybeCloseLookup` finalizes once (a `lookupClosed` latch) when every scanner settles.
+  createLookup/closeLookup failures are non-fatal. Scan.spec: create→fresh, close-on-settle,
+  non-fatal. 77 tests + lint + build green.
+- [x] **6.4** `test` Component test: results state hides input + shows Start over; metadata
+  panel shows the record fields.
+  DOM test enters `results/replay` and asserts the rendered output contains "Request record",
+  the client IP, status ("Complete") and joined scanners, that `VuePhoneNumberInput` is absent,
+  and that "Start over" is shown.
+- **Gate:** ✅ `yarn test:unit` green (78 tests); fresh lookup persists+renders (6.3 covered);
+  lint + build green.
+
+## Phase 7 — Replay, Run new lookup, Previous lookups dropdown
+
+- [x] **7.1** `feat` On Lookup click, call `getLatestLookup`; on **200** enter `results/replay`
+  and render stored detail with **no** scans; on **404** run a fresh lookup (AC7).
+  `runScans` now calls `getLatestLookup` first: truthy → `replayLookup` (populate localData from
+  stored `number`, build scanners/statuses from stored `results`, enter `results/replay`); null
+  → `freshLookupFlow`. `Scanner` gained `replay`/`replayResult` props — in replay it seeds `data`
+  from the stored payload and returns early from `mounted()` (no dryrun/run), emitting `result`
+  for the matrix. Scan.spec: 200 replays with no createLookup/axios.post, 404 runs fresh.
+- [x] **7.2** `feat` Add **Run new lookup** (forces fresh scan of the same number, AC8).
+  `runNewLookup` clears the replayed results in place (`resetResultsState`, keeps the number)
+  and runs `freshLookupFlow` → new `createLookup` + `results/fresh`. Button shown in the replay
+  controls next to Start over. Scan.spec: replay → Run new lookup creates a new lookup + fresh.
+- [x] **7.3** `feat` Add **Previous lookups ▾** dropdown: `listLookups(number)`; selecting an
+  entry loads `getLookup(id)` and renders in `replay` mode (AC9).
+  `b-dropdown` in the replay controls loads `listLookups(number)` on `@show`; each item's
+  `@click` runs `openPreviousLookup(id)` → `getLookup` → `resetResultsState` + `replayLookup`
+  (no scans). `previousLookupLabel` = time + status. Scan.spec: loads-on-open + open→replay.
+- [x] **7.4** `feat` Replay banner ("Showing your most recent lookup from &lt;time&gt;").
+  `replayBannerText` computed (empty unless `isReplay`) renders a `b-alert` with the localized
+  `createdAt`. Scan.spec: banner shown in replay, absent in fresh.
+- [x] **7.5** `test` Component tests: entry→replay on 200 (**assert no `/run` calls**),
+  entry→fresh on 404, Run new lookup re-scans, dropdown loads detail (AC7–AC9).
+  Scan.spec covers entry→replay (no createLookup/axios.post), entry→fresh (404), Run new lookup
+  (AC8), dropdown load+open→replay (AC9). Added Scanner.spec replay tests that mount a real
+  Scanner in replay and assert **zero** axios calls (no dryrun/run) for success and error —
+  the faithful "no `/run` calls" guarantee.
+- **Gate:** ✅ `yarn test:unit` green (87 tests); replay shows results without re-scanning; lint
+  + build green.
+
+## Phase 8 — Docker, purge script, docs
+
+- [x] **8.1** `chore` `support/docker/docker-compose.yml`: add
+  `PHONEINFOGA_DB_PATH=/app/data/phoneinfoga.db` env + `./data:/app/data` volume.
+  Added the env + `./data:/app/data` bind mount; `docker compose config` validates. Also
+  gitignored `*.db`/`-wal`/`-shm` and `support/docker/data/` so runtime DB files aren't committed.
+- [x] **8.2** `chore` `.env.example`: document `PHONEINFOGA_DB_PATH`.
+  Added a "Lookup persistence" section documenting the env, its defaults (local vs Docker),
+  backup guidance (copy DB + `-wal`/`-shm`), the PII/retention note, and the purge script pointer.
+- [x] **8.3** `feat` `support/scripts/purge-lookups.sh`: delete records older than N days
+  (arg/env) and `VACUUM`. Idempotent.
+  Days via arg or `PHONEINFOGA_PURGE_DAYS` (default 30); DB via `PHONEINFOGA_DB_PATH`. Uses
+  `julianday(created_at) < julianday('now','-N days')` and `PRAGMA foreign_keys=ON` so
+  `scanner_results` cascade. Guards: integer validation, missing sqlite3/db/table → no-op exit 0.
+  SQL verified via the pure-Go driver (old row + its result deleted, recent row kept). Executable.
+- [x] **8.4** `docs` README self-hosting section: DB path, volume mount, **backup = copy
+  `./data` (incl. `-wal`/`-shm`)**, PII note, purge usage.
+  Added a "Self-hosting: lookup persistence" section (DB path, Docker volume, backup incl.
+  `-wal`/`-shm`, PII/retention, purge usage) + a Features bullet. Fixed a pre-existing
+  compose `dockerfile:` path bug (`../../Dockerfile` → `Dockerfile`, relative to context)
+  so `docker compose build` works.
+- **Gate:** ✅ `docker compose build` succeeds — full no-CGO multi-stage image built
+  (pure-Go modernc, alpine runtime). Live persist-across-`down`/`up` E2E is covered by 9.3.
+
+## Phase 9 — Verification & close-out
+
+- [x] **9.1** `test` Full Go suite green: `go test ./...`; confirm ≥80% on new packages.
+  `CGO_ENABLED=0 go test ./...` all green (incl. `examples/plugin`). Coverage: store **80.5%**;
+  new handler code in handlers pkg 94.6%; new `cmd/serve_store.go` 100%/87.5% (`resolveDBPath`/
+  `setupStore`). (`-race` skipped locally: no gcc on this Windows box; CI runs it on Linux.)
+- [x] **9.2** `test` Frontend suite green: `yarn lint && yarn test:unit && yarn build`.
+  `yarn lint` clean, `yarn test:unit` 87/87 across 8 suites, `yarn build` produces dist. All green.
+- [x] **9.3** `test` Manual E2E in Docker: fresh lookup → restart container → replay from
+  disk (AC4); verify AC1–AC13 checklist in the spec.
+  Ran the real `docker compose down/up` (bind-mounted `./data`) against the built image via the
+  REST API with the `local` scanner: AC1 pending record, AC2 result persisted (200), AC3 close→
+  complete, **AC4 replay from disk after down/up ✅**, AC9 list, AC10 other-number→404, AC13
+  `/run` without lookupId→200 (unchanged). **Fixed an AC4 durability defect the E2E surfaced:**
+  WAL's `-wal`/`-shm` sidecars go stale after an unclean container stop and hide committed data
+  from a fresh container — switched the store to `journal_mode=DELETE` + `synchronous=FULL`
+  (single durable `.db` file; `SetMaxOpenConns(1)` means WAL's concurrency is unneeded). Updated
+  spec §5/§9, README, `.env.example`, docker-compose comment (backup = copy the single `.db`).
+- [x] **9.4** `chore` Self-review for CRITICAL/HIGH issues (security-reviewer on IP/PII
+  handling + SQL); ensure parameterized queries only.
+  security-reviewer agent: 0 CRITICAL, 0 code-level HIGH. SQL fully parameterized (incl.
+  verified-safe `PRAGMA user_version` int-from-embedded-filename); purge script clean;
+  cross-number scoping correct; no PII/path/stack-trace leak in HTTP responses. One
+  architectural HIGH (unauthenticated unbounded persistent writes → storage DoS; drops to LOW
+  for the documented single-user model). Remediation: hard-capped history reads
+  (`maxListLimit=100`, store-level + tested) and an explicit exposure/deployment note in README +
+  spec §9 (keep off untrusted networks, schedule purge). A rate limiter is intentionally not
+  added (out of scope for the no-auth single-user design); residual risk consciously accepted.
+- [x] **9.5** `docs` Flip spec **Status** to `Implemented`; open a PR to `dev` with Summary
+  + Test Plan (mind the 400/800-line size rule — split the PR if needed).
+  Spec Status → Implemented. Branch `feat/provider-comparison-matrix` pushed (clean FF ahead of
+  `origin/dev`, no rebase needed); PR #26 opened → `dev` with Summary + Test Plan. Size note in
+  the PR: the branch is stacked on the unmerged provider-comparison work (~5.7k lines total,
+  persistence ~4.4k) — a cohesive TDD feature that doesn't split cleanly; flagged for reviewers.
+- **Gate:** ✅ all boxes ticked; PR #26 opened to `dev` (https://github.com/aberrantCode/phoneinfoga/pull/26).

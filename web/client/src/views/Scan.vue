@@ -1,6 +1,12 @@
 <template>
   <div>
-    <b-form @submit="onSubmit" class="d-flex justify-content-center mt-5">
+    <!-- Entry state: phone-number field, country selector and Lookup button. In the
+         results state these are hidden and replaced by the Start over control (AC6). -->
+    <b-form
+      v-if="!isResultsState"
+      @submit="onSubmit"
+      class="d-flex justify-content-center mt-5"
+    >
       <b-form-group id="input-group-1" label-for="input-1">
         <b-input-group>
           <VuePhoneNumberInput
@@ -30,6 +36,53 @@
         </b-input-group>
       </b-form-group>
     </b-form>
+
+    <div
+      v-if="isResultsState"
+      class="results-controls d-flex justify-content-center mt-5"
+    >
+      <b-button
+        v-if="isReplay"
+        variant="dark"
+        size="sm"
+        class="mr-2"
+        :disabled="loading"
+        @click="runNewLookup"
+      >
+        Run new lookup
+      </b-button>
+      <b-dropdown
+        v-if="isReplay"
+        text="Previous lookups"
+        variant="outline-primary"
+        size="sm"
+        class="mr-2"
+        @show="loadPreviousLookups"
+      >
+        <b-dropdown-item
+          v-for="item in previousLookups"
+          :key="item.id"
+          @click="openPreviousLookup(item.id)"
+        >
+          {{ previousLookupLabel(item) }}
+        </b-dropdown-item>
+        <b-dropdown-text v-if="previousLookups.length === 0">
+          No previous lookups.
+        </b-dropdown-text>
+      </b-dropdown>
+      <b-button variant="outline-secondary" size="sm" @click="startOver">
+        Start over
+      </b-button>
+    </div>
+
+    <b-alert
+      v-if="replayBannerText"
+      show
+      variant="info"
+      class="replay-banner mt-3 mb-0"
+    >
+      {{ replayBannerText }}
+    </b-alert>
 
     <div v-if="!isLookup && inputNumberValid" class="scanner-selector">
       <div class="scanner-selector-toolbar">
@@ -78,7 +131,11 @@
       </p>
     </div>
 
-    <b-card v-if="isLookup || showInformations" no-body class="mb-3 mt-3">
+    <b-card
+      v-if="isLookup || showInformations || isResultsState"
+      no-body
+      class="mb-3 mt-3"
+    >
       <b-card-header
         class="bg-white results-section-header"
         @click="informationExpanded = !informationExpanded"
@@ -106,6 +163,47 @@
               <span class="metadata-value">{{ item.value }}</span>
             </div>
           </div>
+
+          <!-- Request/results record (AC5): time, client IP, scanners, status. -->
+          <div v-if="lookupRecordItems.length" class="metadata-record mt-3">
+            <h3 class="metadata-record-title text-left">Request record</h3>
+            <div class="metadata-grid">
+              <div
+                v-for="item in lookupRecordItems"
+                :key="item.label"
+                class="metadata-item text-left"
+              >
+                <span class="metadata-label">{{ item.label }}</span>
+                <span class="metadata-value">{{ item.value }}</span>
+              </div>
+            </div>
+          </div>
+        </b-card-body>
+      </b-collapse>
+    </b-card>
+
+    <b-card v-if="isLookup" no-body class="mb-3">
+      <b-card-header
+        class="bg-white results-section-header"
+        @click="comparisonExpanded = !comparisonExpanded"
+      >
+        <button
+          class="results-section-toggle"
+          type="button"
+          :aria-expanded="comparisonExpanded ? 'true' : 'false'"
+          aria-controls="scan-comparison-collapse"
+          @click.stop="comparisonExpanded = !comparisonExpanded"
+        >
+          <span aria-hidden="true">{{ comparisonExpanded ? "-" : "+" }}</span>
+          <span>Provider comparison</span>
+        </button>
+      </b-card-header>
+      <b-collapse id="scan-comparison-collapse" v-model="comparisonExpanded">
+        <b-card-body>
+          <ProviderComparison
+            :baseline="localData"
+            :results="comparisonResults"
+          />
         </b-card-body>
       </b-collapse>
     </b-card>
@@ -177,10 +275,15 @@
             :key="index"
             :name="getScannerDisplayName(scanner.name)"
             :scanId="scanner.name"
-            :autoRun="true"
+            :autoRun="!isReplay"
+            :auto-expand-on-data="!isComparisonProvider(scanner.name)"
             :scan-options="getScannerRunOptions(scanner.name)"
             :metadata="localData"
+            :lookup-id="activeLookupId"
+            :replay="isReplay"
+            :replay-result="replayResultFor(scanner.name)"
             @status="updateScannerStatus"
+            @result="captureScannerResult"
           />
         </b-card-body>
       </b-collapse>
@@ -199,12 +302,45 @@ import {
   getScannerDisplayName,
   getScannerDescription,
   getScannerRunOptions,
+  createLookup,
+  closeLookup,
+  getLatestLookup,
+  listLookups,
+  getLookup,
   ScannerAvailability,
+  LookupDetail,
+  LookupResult,
+  LookupSummary,
+  CreateLookupResult,
 } from "../utils";
 import VuePhoneNumberInput from "vue-phone-number-input";
 import Scanner from "../components/Scanner.vue";
+import ProviderComparison from "../components/ProviderComparison.vue";
 import axios, { AxiosResponse } from "axios";
 import config from "@/config";
+
+// Renders an RFC3339 timestamp in the viewer's locale, falling back to the raw
+// value if it can't be parsed.
+const formatTimestamp = (iso: string): string => {
+  if (!iso) {
+    return "";
+  }
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+};
+
+const titleCase = (value: string): string =>
+  value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+
+// Scanners whose results share the validation-field vocabulary and therefore
+// belong in the provider-comparison matrix.
+const COMPARISON_PROVIDERS = [
+  "numverify",
+  "veriphone",
+  "numlookupapi",
+  "abstract",
+  "twilio",
+];
 
 interface InputNumberObject {
   countryCallingCode: string;
@@ -224,10 +360,12 @@ interface Data {
   loading: boolean;
   scannerLoading: boolean;
   scannerError: string;
+  viewState: ViewState;
   isLookup: boolean;
   showInformations: boolean;
   informationExpanded: boolean;
   scannersExpanded: boolean;
+  comparisonExpanded: boolean;
   inputNumber: string;
   inputNumberVal: string;
   inputNumberValid: boolean;
@@ -237,6 +375,10 @@ interface Data {
   scanners: ScannerAvailability[];
   scannerStatuses: ScannerStatus[];
   scannerFailures: { [name: string]: string };
+  scannerResults: { [name: string]: unknown };
+  activeLookupId: string;
+  lookupClosed: boolean;
+  previousLookups: LookupSummary[];
   localData: {
     valid: boolean;
     raw_local: string;
@@ -258,6 +400,22 @@ interface ScannerStatus {
   error?: string;
 }
 
+// The page is a two-state flow: `entry` (number field + scanner picker) and
+// `results` (rendered lookup). Results has two sources: `fresh` (just ran) or
+// `replay` (loaded from history). activeLookup holds the replayed record, if any.
+type ViewStateName = "entry" | "results";
+type ViewStateSource = "fresh" | "replay";
+
+// A fresh lookup starts from a CreateLookupResult (record only); a replayed lookup
+// carries the full LookupDetail. Both expose the fields the record panel needs.
+type ActiveLookup = LookupDetail | CreateLookupResult;
+
+interface ViewState {
+  state: ViewStateName;
+  source: ViewStateSource;
+  activeLookup: ActiveLookup | null;
+}
+
 export type ScanResponse<T> = AxiosResponse<{
   success: boolean;
   result: T;
@@ -265,16 +423,18 @@ export type ScanResponse<T> = AxiosResponse<{
 }>;
 
 export default Vue.extend({
-  components: { Scanner, VuePhoneNumberInput },
+  components: { Scanner, ProviderComparison, VuePhoneNumberInput },
   data(): Data {
     return {
       loading: false,
       scannerLoading: false,
       scannerError: "",
+      viewState: { state: "entry", source: "fresh", activeLookup: null },
       isLookup: false,
       showInformations: false,
       informationExpanded: true,
       scannersExpanded: true,
+      comparisonExpanded: true,
       inputNumber: "",
       inputNumberVal: "",
       inputNumberValid: false,
@@ -284,6 +444,10 @@ export default Vue.extend({
       scanners: [],
       scannerStatuses: [],
       scannerFailures: {},
+      scannerResults: {},
+      activeLookupId: "",
+      lookupClosed: false,
+      previousLookups: [],
       localData: {
         valid: false,
         raw_local: "",
@@ -311,6 +475,47 @@ export default Vue.extend({
   },
   computed: {
     ...mapState(["number"]),
+    isEntryState(): boolean {
+      return this.viewState.state === "entry";
+    },
+    isResultsState(): boolean {
+      return this.viewState.state === "results";
+    },
+    isReplay(): boolean {
+      return (
+        this.viewState.state === "results" && this.viewState.source === "replay"
+      );
+    },
+    // Replay banner text (spec §8): identifies that the shown results were loaded from
+    // history rather than freshly scanned. Empty in the fresh results / entry states.
+    replayBannerText(): string {
+      const lookup = this.viewState.activeLookup;
+      if (!this.isReplay || !lookup) {
+        return "";
+      }
+      const time = formatTimestamp(lookup.createdAt) || lookup.createdAt;
+      return `Showing your most recent lookup from ${time}.`;
+    },
+    // The request/results record shown alongside the number metadata (AC5): when a
+    // lookup is active, surface its time, client IP, requested scanners and status.
+    lookupRecordItems(): Array<{ label: string; value: string }> {
+      const lookup = this.viewState.activeLookup;
+      if (!lookup) {
+        return [];
+      }
+
+      const items = [
+        { label: "Lookup time", value: formatTimestamp(lookup.createdAt) },
+        { label: "Client IP", value: lookup.clientIp || "" },
+        {
+          label: "Scanners requested",
+          value: (lookup.scannersRequested || []).join(", "),
+        },
+        { label: "Status", value: titleCase(lookup.status) },
+      ];
+
+      return items.filter((item) => item.value !== "");
+    },
     metadataItems(): Array<{ label: string; value: string }> {
       const items = [
         { label: "Valid", value: this.localData.valid ? "Yes" : "No" },
@@ -363,11 +568,32 @@ export default Vue.extend({
         ["complete", "canceled", "error"].includes(item.status)
       ).length;
     },
+    comparisonResults(): { [name: string]: unknown } {
+      return COMPARISON_PROVIDERS.reduce(
+        (acc: { [name: string]: unknown }, name) => {
+          if (this.scannerResults[name] !== undefined) {
+            acc[name] = this.scannerResults[name];
+          }
+          return acc;
+        },
+        {}
+      );
+    },
   },
   methods: {
     getScannerDisplayName,
     getScannerDescription,
     getScannerRunOptions,
+    isComparisonProvider(name: string): boolean {
+      return COMPARISON_PROVIDERS.includes(name);
+    },
+    captureScannerResult(payload: { scanId: string; data: unknown }): void {
+      // Immutable update so the comparisonResults computed re-evaluates.
+      this.scannerResults = {
+        ...this.scannerResults,
+        [payload.scanId]: payload.data,
+      };
+    },
     scannerToggleTitle(scanner: ScannerAvailability): string {
       if (!scanner.available) {
         return scanner.error
@@ -376,12 +602,37 @@ export default Vue.extend({
       }
       return getScannerDescription(scanner.name);
     },
+    // enterResults / enterEntry are the two view-state transitions. Phases 6-7 use
+    // them to drive the fresh-lookup and replay flows; clearData resets to entry.
+    enterResults(
+      source: ViewStateSource,
+      lookup: ActiveLookup | null = null
+    ): void {
+      this.viewState = { state: "results", source, activeLookup: lookup };
+    },
+    enterEntry(): void {
+      this.viewState = { state: "entry", source: "fresh", activeLookup: null };
+    },
+    // startOver resets the whole page back to the entry state and clears the number
+    // field so the user can look up a different number (AC6).
+    startOver(): void {
+      this.clearData();
+      this.inputNumber = "";
+      this.inputNumberVal = "";
+      this.inputNumberValid = false;
+    },
     clearData() {
+      this.enterEntry();
       this.isLookup = false;
       this.showInformations = false;
       this.informationExpanded = true;
       this.scannersExpanded = true;
+      this.comparisonExpanded = true;
       this.scannerStatuses = [];
+      this.scannerResults = {};
+      this.activeLookupId = "";
+      this.lookupClosed = false;
+      this.previousLookups = [];
       this.$store.commit("resetState");
     },
     async loadScannerAvailability(): Promise<void> {
@@ -400,6 +651,8 @@ export default Vue.extend({
       }
       this.scannerLoading = false;
     },
+    // runScans is the Lookup click handler. It first checks for a prior lookup of this
+    // number: a hit is replayed from storage (no scans, AC7); a miss runs a fresh lookup.
     async runScans(): Promise<void> {
       this.clearData();
       if (!isValid(this.inputNumber)) {
@@ -408,27 +661,176 @@ export default Vue.extend({
       }
 
       this.loading = true;
-
       this.$store.commit("setNumber", formatNumber(this.inputNumber));
 
       try {
-        const res = await axios.post(`${config.apiUrl}/v2/numbers`, {
-          number: this.$store.state.number,
-        });
-
-        this.localData = res.data;
-
-        if (this.localData.valid) {
-          this.getScanners();
-          this.isLookup = true;
+        const latest = await getLatestLookup(this.$store.state.number);
+        if (latest) {
+          this.replayLookup(latest);
         } else {
-          this.showInformations = true;
+          await this.freshLookupFlow();
         }
       } catch (error) {
         this.$store.commit("pushError", { message: error });
       }
 
       this.loading = false;
+    },
+    // runNewLookup forces a fresh scan of the current number, bypassing the replay check
+    // (AC8). Called from the replay controls; keeps the number, discards replayed results.
+    async runNewLookup(): Promise<void> {
+      this.resetResultsState();
+      this.loading = true;
+      try {
+        await this.freshLookupFlow();
+      } catch (error) {
+        this.$store.commit("pushError", { message: error });
+      }
+      this.loading = false;
+    },
+    // loadPreviousLookups fetches this number's history for the Previous lookups dropdown (AC9).
+    async loadPreviousLookups(): Promise<void> {
+      try {
+        this.previousLookups = await listLookups(this.$store.state.number);
+      } catch (error) {
+        this.previousLookups = [];
+      }
+    },
+    // openPreviousLookup loads a historical lookup's full detail and renders it in replay
+    // mode (AC9) — no re-scanning.
+    async openPreviousLookup(id: string): Promise<void> {
+      try {
+        const detail = await getLookup(id);
+        this.resetResultsState();
+        this.replayLookup(detail);
+      } catch (error) {
+        this.$store.commit("pushError", { message: error });
+      }
+    },
+    // previousLookupLabel formats a history entry for the dropdown.
+    previousLookupLabel(summary: LookupSummary): string {
+      const time = formatTimestamp(summary.createdAt) || summary.createdAt;
+      return `${time} — ${titleCase(summary.status)}`;
+    },
+    // resetResultsState clears the rendered results without leaving the results view or
+    // clearing the number, so a Run new lookup can re-render in place.
+    resetResultsState(): void {
+      this.isLookup = false;
+      this.showInformations = false;
+      this.scanners = [];
+      this.scannerStatuses = [];
+      this.scannerResults = {};
+      this.activeLookupId = "";
+      this.lookupClosed = false;
+    },
+    // freshLookupFlow fetches number metadata and, when valid, runs a fresh lookup.
+    async freshLookupFlow(): Promise<void> {
+      const res = await axios.post(`${config.apiUrl}/v2/numbers`, {
+        number: this.$store.state.number,
+      });
+      this.localData = res.data;
+
+      if (this.localData.valid) {
+        await this.startFreshLookup();
+      } else {
+        this.showInformations = true;
+      }
+    },
+    // replayLookup renders a stored lookup without running any scanner (AC7). The stored
+    // per-scanner raw payloads are byte-identical to live results, so the same display
+    // components render them; each Scanner is mounted in replay mode.
+    replayLookup(detail: LookupDetail): void {
+      this.localData = {
+        valid: detail.number.valid,
+        raw_local: detail.number.rawLocal,
+        local: detail.number.local,
+        e164: detail.number.e164,
+        international: detail.number.international,
+        countryCode: detail.number.countryCode,
+        country: detail.number.country,
+        carrier: detail.number.carrier,
+      };
+
+      this.scanners = detail.results.map((result) => ({
+        name: result.scanner,
+        description: "",
+        available: true,
+      }));
+      this.scannerStatuses = detail.results.map((result) => ({
+        scanId: result.scanner,
+        scanner: getScannerDisplayName(result.scanner),
+        status: result.status === "error" ? "error" : "complete",
+        message:
+          result.status === "error"
+            ? result.errorMessage || "Scanner failed"
+            : "Loaded from history",
+      }));
+
+      this.enterResults("replay", detail);
+      this.isLookup = true;
+    },
+    // replayResultFor returns the stored result for a scanner when rendering a replay.
+    replayResultFor(name: string): LookupResult | null {
+      const lookup = this.viewState.activeLookup;
+      if (!lookup || !("results" in lookup)) {
+        return null;
+      }
+      return lookup.results.find((result) => result.scanner === name) || null;
+    },
+    // startFreshLookup records the request (createLookup) BEFORE the scanners mount,
+    // so each per-scanner /run carries the lookupId and its result is persisted (AC1/AC2).
+    // Persistence is best-effort: a createLookup failure still renders live results.
+    async startFreshLookup(): Promise<void> {
+      await this.getScanners();
+      const scannerNames = this.scanners.map((scanner) => scanner.name);
+
+      try {
+        const record = await createLookup(
+          this.$store.state.number,
+          scannerNames
+        );
+        this.activeLookupId = record.id;
+        this.enterResults("fresh", record);
+      } catch (error) {
+        this.activeLookupId = "";
+        this.enterResults("fresh", null);
+      }
+
+      // Rendering the scanners (autoRun) starts the per-scanner runs with the lookupId.
+      this.isLookup = true;
+    },
+    // maybeCloseLookup finalizes the lookup exactly once, after every scanner has
+    // reached a terminal state (AC3). Closing is best-effort.
+    maybeCloseLookup(): void {
+      if (
+        !this.activeLookupId ||
+        this.lookupClosed ||
+        this.scanners.length === 0
+      ) {
+        return;
+      }
+
+      const settled = this.scannerStatuses.filter((status) =>
+        ["complete", "error", "canceled"].includes(status.status)
+      ).length;
+      if (settled < this.scanners.length) {
+        return;
+      }
+
+      this.lookupClosed = true;
+      closeLookup(this.activeLookupId)
+        .then((summary) => {
+          const current = this.viewState.activeLookup;
+          if (current) {
+            this.viewState = {
+              ...this.viewState,
+              activeLookup: { ...current, status: summary.status },
+            };
+          }
+        })
+        .catch(() => {
+          // Availability over durability: a failed close must not break the UI.
+        });
     },
     onSubmit(evt: Event) {
       evt.preventDefault();
@@ -485,6 +887,8 @@ export default Vue.extend({
         delete rest[status.scanId];
         this.scannerFailures = rest;
       }
+
+      this.maybeCloseLookup();
     },
     cancelRunningScanners(): void {
       const refs = this.$refs.scannerRefs as Vue[] | Vue | undefined;
@@ -676,6 +1080,14 @@ export default Vue.extend({
 
 .metadata-value {
   overflow-wrap: anywhere;
+}
+
+.metadata-record-title {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
 }
 
 .scan-status-list {

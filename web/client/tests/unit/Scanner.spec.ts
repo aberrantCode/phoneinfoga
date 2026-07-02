@@ -46,6 +46,70 @@ describe("Scanner.vue", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  describe("replay mode (AC7)", () => {
+    it("renders a stored success result with no dryrun or run request", async () => {
+      const wrapper = mountScanner({
+        replay: true,
+        replayResult: { status: "success", raw: { info: "stored" } },
+      });
+      await wrapper.vm.$nextTick();
+
+      // The whole point of replay: no network at all (no /dryrun, no /run).
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(wrapper.vm.data).toEqual({ info: "stored" });
+    });
+
+    it("shows a stored error result without scanning", async () => {
+      const wrapper = mountScanner({
+        replay: true,
+        replayResult: { status: "error", errorMessage: "quota exceeded" },
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(wrapper.vm.error).toBe("quota exceeded");
+    });
+  });
+
+  describe("runScan lookupId threading", () => {
+    const runBodyOf = (): Record<string, unknown> | undefined => {
+      const call = mockedAxios.post.mock.calls.find((c) =>
+        String(c[0]).endsWith("/run")
+      );
+      return call?.[1] as Record<string, unknown> | undefined;
+    };
+
+    const prepareRun = (): void => {
+      // Auto-mocked CancelToken.source() returns undefined; give runScan a usable source.
+      (mockedAxios.CancelToken as any).source = jest.fn(() => ({
+        token: "cancel-token",
+        cancel: jest.fn(),
+      }));
+      mockedAxios.post.mockReset();
+      mockedAxios.post.mockResolvedValue({ data: { result: {} } } as never);
+    };
+
+    it("includes lookupId in the run body when the prop is set", async () => {
+      const wrapper = mountScanner({ lookupId: "lk-123" });
+      await wrapper.vm.$nextTick();
+      prepareRun();
+
+      await (wrapper.vm as any).runScan();
+
+      expect(runBodyOf()).toMatchObject({ lookupId: "lk-123" });
+    });
+
+    it("omits lookupId when the prop is absent (backward compatible)", async () => {
+      const wrapper = mountScanner();
+      await wrapper.vm.$nextTick();
+      prepareRun();
+
+      await (wrapper.vm as any).runScan();
+
+      expect(runBodyOf()).not.toHaveProperty("lookupId");
+    });
+  });
+
   describe("errorText", () => {
     it("returns a string error verbatim", () => {
       const wrapper = mountScanner();

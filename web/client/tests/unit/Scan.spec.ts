@@ -6,23 +6,43 @@ import { BootstrapVue, BootstrapVueIcons } from "bootstrap-vue";
 import Vuex, { Store } from "vuex";
 
 // Keep the pure helpers (display names, descriptions, default selection) real,
-// but stub the one function that hits the network so mounting the view does not
-// fire a real dryrun probe.
+// but stub the functions that hit the network so mounting/orchestration does not
+// fire real requests.
 jest.mock("@/utils", () => {
   const actual = jest.requireActual("@/utils");
   return {
     __esModule: true,
     ...actual,
     getScannerAvailability: jest.fn().mockResolvedValue([]),
+    createLookup: jest.fn(),
+    closeLookup: jest.fn(),
+    getLatestLookup: jest.fn().mockResolvedValue(null),
+    listLookups: jest.fn().mockResolvedValue([]),
+    getLookup: jest.fn(),
   };
 });
+jest.mock("axios");
 
+import axios from "axios";
 import Scan from "@/views/Scan.vue";
+import VuePhoneNumberInput from "vue-phone-number-input";
 import {
   getScannerAvailability,
   getScannerDescription,
+  createLookup,
+  closeLookup,
+  getLatestLookup,
+  listLookups,
+  getLookup,
   ScannerAvailability,
 } from "@/utils";
+
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedCreateLookup = createLookup as jest.Mock;
+const mockedCloseLookup = closeLookup as jest.Mock;
+const mockedGetLatestLookup = getLatestLookup as jest.Mock;
+const mockedListLookups = listLookups as jest.Mock;
+const mockedGetLookup = getLookup as jest.Mock;
 
 const mockedGetAvailability = getScannerAvailability as jest.Mock;
 
@@ -296,6 +316,488 @@ describe("Scan.vue", () => {
       expect(labels).toContain("Country");
       expect(labels).not.toContain("Calling code"); // value was 0
       expect(labels).not.toContain("Local"); // value was ""
+    });
+  });
+
+  describe("viewState model", () => {
+    it("starts in the entry state with no active lookup", () => {
+      const { wrapper } = mountScan();
+      expect(wrapper.vm.viewState).toMatchObject({
+        state: "entry",
+        source: "fresh",
+        activeLookup: null,
+      });
+      expect(wrapper.vm.isEntryState).toBe(true);
+      expect(wrapper.vm.isResultsState).toBe(false);
+      expect(wrapper.vm.isReplay).toBe(false);
+    });
+
+    it("enterResults('fresh') moves to a fresh results state", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("fresh");
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.isReplay).toBe(false);
+    });
+
+    it("enterResults('replay', lookup) records the active lookup and is a replay", () => {
+      const { wrapper } = mountScan();
+      const lookup = { id: "lk-1", results: [] };
+      wrapper.vm.enterResults("replay", lookup);
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.isReplay).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup).toBe(lookup);
+    });
+
+    it("enterEntry() (and clearData) return to the entry state", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", { id: "lk-1", results: [] });
+      wrapper.vm.enterEntry();
+      expect(wrapper.vm.isEntryState).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup).toBeNull();
+
+      wrapper.vm.enterResults("fresh");
+      wrapper.vm.clearData();
+      expect(wrapper.vm.isEntryState).toBe(true);
+    });
+  });
+
+  describe("fresh-lookup orchestration (AC1-AC3)", () => {
+    const flush = (): Promise<void> =>
+      new Promise((resolve) => setTimeout(resolve, 0));
+    const validNumber = {
+      valid: true,
+      e164: "+14152229670",
+      raw_local: "",
+      local: "",
+      international: "",
+      countryCode: 1,
+      country: "US",
+      carrier: "",
+    };
+
+    beforeEach(() => {
+      mockedCreateLookup.mockReset();
+      mockedCloseLookup.mockReset();
+      mockedAxios.post.mockReset();
+      // Default: no prior lookup, so runScans takes the fresh path.
+      mockedGetLatestLookup.mockReset();
+      mockedGetLatestLookup.mockResolvedValue(null);
+    });
+
+    // Drain the mounted() availability loader first so it can't overwrite the
+    // scanner selection we set up here mid-runScans.
+    const arrangeFreshLookup = async (
+      wrapper: Wrapper<Vue & Record<string, any>>
+    ): Promise<void> => {
+      await flush();
+      wrapper.vm.inputNumber = "14152229670";
+      wrapper.vm.scannerAvailability = [scanner("local", true)];
+      wrapper.vm.selectedScannerNames = ["local"];
+    };
+
+    it("creates a lookup and enters the fresh results state", async () => {
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-9",
+        createdAt: "2026-07-01T10:00:00Z",
+        clientIp: "1.2.3.4",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(mockedCreateLookup).toHaveBeenCalledTimes(1);
+      expect(mockedCreateLookup.mock.calls[0][1]).toEqual(["local"]);
+      expect(wrapper.vm.activeLookupId).toBe("lk-9");
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.viewState.source).toBe("fresh");
+    });
+
+    it("closes the lookup once every scanner settles", async () => {
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-9",
+        createdAt: "",
+        clientIp: "",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedCloseLookup.mockResolvedValue({
+        id: "lk-9",
+        status: "complete",
+        completedAt: "2026-07-01T10:01:00Z",
+        scannersRequested: ["local"],
+        createdAt: "",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      wrapper.vm.updateScannerStatus({
+        scanId: "local",
+        scanner: "Local",
+        status: "complete",
+        message: "done",
+      });
+      await flush();
+
+      expect(mockedCloseLookup).toHaveBeenCalledWith("lk-9");
+    });
+
+    it("still shows results when createLookup fails (persistence is non-fatal)", async () => {
+      mockedCreateLookup.mockRejectedValue(new Error("db down"));
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(wrapper.vm.isResultsState).toBe(true);
+      expect(wrapper.vm.activeLookupId).toBe("");
+    });
+
+    it("replays the latest lookup without scanning on 200 (AC7)", async () => {
+      mockedGetLatestLookup.mockResolvedValue({
+        id: "lk-old",
+        status: "complete",
+        createdAt: "2026-07-01T09:00:00Z",
+        completedAt: "2026-07-01T09:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "4152229670",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [
+          {
+            scanner: "local",
+            status: "success",
+            raw: { e164: "+14152229670" },
+            durationMs: 1,
+            startedAt: "2026-07-01T09:00:00Z",
+            finishedAt: "2026-07-01T09:00:00Z",
+          },
+        ],
+      });
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(mockedGetLatestLookup).toHaveBeenCalled();
+      // Replay: no fresh persistence and no /run or /v2/numbers requests (AC7).
+      expect(mockedCreateLookup).not.toHaveBeenCalled();
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(wrapper.vm.isReplay).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup.id).toBe("lk-old");
+      expect(wrapper.vm.localData.e164).toBe("+14152229670");
+    });
+
+    it("runs a fresh lookup when there is no prior lookup (404)", async () => {
+      mockedGetLatestLookup.mockResolvedValue(null);
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-new",
+        createdAt: "",
+        clientIp: "",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(mockedCreateLookup).toHaveBeenCalled();
+      expect(wrapper.vm.viewState.source).toBe("fresh");
+    });
+
+    it("Run new lookup forces a fresh scan from replay (AC8)", async () => {
+      mockedGetLatestLookup.mockResolvedValue({
+        id: "lk-old",
+        status: "complete",
+        createdAt: "2026-07-01T09:00:00Z",
+        completedAt: "2026-07-01T09:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [
+          {
+            scanner: "local",
+            status: "success",
+            raw: {},
+            durationMs: 1,
+            startedAt: "",
+            finishedAt: "",
+          },
+        ],
+      });
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-new",
+        createdAt: "",
+        clientIp: "",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+      expect(wrapper.vm.isReplay).toBe(true);
+
+      await wrapper.vm.runNewLookup();
+      await flush();
+
+      // A brand-new lookup was created and we are now in the fresh results state.
+      expect(mockedCreateLookup).toHaveBeenCalled();
+      expect(wrapper.vm.viewState.source).toBe("fresh");
+      expect(wrapper.vm.activeLookupId).toBe("lk-new");
+    });
+  });
+
+  describe("previous lookups dropdown (AC9)", () => {
+    const flush = (): Promise<void> =>
+      new Promise((resolve) => setTimeout(resolve, 0));
+
+    beforeEach(() => {
+      mockedListLookups.mockReset();
+      mockedGetLookup.mockReset();
+    });
+
+    it("loads the number's lookups on open", async () => {
+      mockedListLookups.mockResolvedValue([
+        {
+          id: "a",
+          e164: "+14152229670",
+          status: "complete",
+          scannersRequested: ["local"],
+          createdAt: "2026-07-01T09:00:00Z",
+          completedAt: null,
+        },
+      ]);
+
+      const { wrapper } = mountScan();
+      await flush();
+      await wrapper.vm.loadPreviousLookups();
+
+      expect(mockedListLookups).toHaveBeenCalled();
+      expect(wrapper.vm.previousLookups).toHaveLength(1);
+    });
+
+    it("opens a selected lookup and renders it in replay mode without scanning", async () => {
+      mockedGetLookup.mockResolvedValue({
+        id: "a",
+        status: "complete",
+        createdAt: "2026-07-01T09:00:00Z",
+        completedAt: "2026-07-01T09:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [
+          {
+            scanner: "local",
+            status: "success",
+            raw: {},
+            durationMs: 1,
+            startedAt: "",
+            finishedAt: "",
+          },
+        ],
+      });
+      mockedAxios.post.mockReset();
+
+      const { wrapper } = mountScan();
+      await flush();
+      await wrapper.vm.openPreviousLookup("a");
+      await flush();
+
+      expect(mockedGetLookup).toHaveBeenCalledWith("a");
+      expect(wrapper.vm.isReplay).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup.id).toBe("a");
+      // No scanning triggered by opening a historical lookup.
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("replay banner", () => {
+    it("shows the replay banner with the lookup time in replay mode", async () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", {
+        id: "lk-1",
+        status: "complete",
+        createdAt: "2026-07-01T10:00:00Z",
+        completedAt: null,
+        clientIp: "",
+        userAgent: "",
+        scannersRequested: [],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [],
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.replayBannerText).toContain(
+        "Showing your most recent lookup from"
+      );
+      expect(wrapper.text()).toContain("Showing your most recent lookup from");
+    });
+
+    it("has no banner in the fresh results state", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("fresh");
+      expect(wrapper.vm.replayBannerText).toBe("");
+    });
+  });
+
+  describe("request record in metadata panel (AC5)", () => {
+    it("derives the lookup record fields from the active lookup", () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", {
+        id: "lk-1",
+        status: "complete",
+        createdAt: "2026-07-01T10:00:00Z",
+        clientIp: "203.0.113.7",
+        scannersRequested: ["local", "numverify"],
+        results: [],
+      });
+
+      const record = wrapper.vm.lookupRecordItems as Array<{
+        label: string;
+        value: string;
+      }>;
+      const byLabel = Object.fromEntries(record.map((i) => [i.label, i.value]));
+
+      expect(Object.keys(byLabel)).toEqual(
+        expect.arrayContaining([
+          "Lookup time",
+          "Client IP",
+          "Scanners requested",
+          "Status",
+        ])
+      );
+      expect(byLabel["Client IP"]).toBe("203.0.113.7");
+      expect(byLabel["Scanners requested"]).toBe("local, numverify");
+      expect(byLabel["Status"]).toBe("Complete");
+      expect(byLabel["Lookup time"]).toBeTruthy();
+    });
+
+    it("has no record items in the entry state", () => {
+      const { wrapper } = mountScan();
+      expect(wrapper.vm.lookupRecordItems).toEqual([]);
+    });
+  });
+
+  describe("results-state input hiding (AC6)", () => {
+    it("shows the phone input in entry state and hides it in results state", async () => {
+      const { wrapper } = mountScan();
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(true);
+
+      wrapper.vm.enterResults("fresh");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(false);
+      expect(wrapper.text()).toContain("Start over");
+    });
+
+    it("startOver returns to entry and clears the input field", async () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("fresh");
+      wrapper.vm.inputNumber = "14152229670";
+      wrapper.vm.inputNumberVal = "14152229670";
+      wrapper.vm.inputNumberValid = true;
+
+      wrapper.vm.startOver();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.isEntryState).toBe(true);
+      expect(wrapper.vm.inputNumber).toBe("");
+      expect(wrapper.vm.inputNumberVal).toBe("");
+      expect(wrapper.vm.inputNumberValid).toBe(false);
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(true);
+    });
+  });
+
+  describe("results-state rendering (AC5 + AC6)", () => {
+    it("renders the request record fields, hides the input and shows Start over", async () => {
+      const { wrapper } = mountScan();
+      wrapper.vm.enterResults("replay", {
+        id: "lk-1",
+        status: "complete",
+        createdAt: "2026-07-01T10:00:00Z",
+        completedAt: "2026-07-01T10:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local", "numverify"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [],
+      });
+      await wrapper.vm.$nextTick();
+
+      const text = wrapper.text();
+      // Request record fields (AC5).
+      expect(text).toContain("Request record");
+      expect(text).toContain("203.0.113.7");
+      expect(text).toContain("Complete");
+      expect(text).toContain("local, numverify");
+
+      // Input hidden, Start over shown (AC6).
+      expect(wrapper.findComponent(VuePhoneNumberInput).exists()).toBe(false);
+      expect(text).toContain("Start over");
     });
   });
 });

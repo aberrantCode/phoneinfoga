@@ -105,13 +105,32 @@
         />
 
         <ScannerSummary
-          v-else-if="isNumverify && hasData"
-          :badge="numverifyBadge"
-          :headline="numverifyHeadline"
-          :subtext="numverifySubtext"
-          :groups="numverifyGroups"
+          v-else-if="isValidationLike && hasData"
+          :badge="validationBadge"
+          :headline="validationHeadline"
+          :subtext="validationSubtext"
+          :groups="validationGroups"
           :col-md="4"
         />
+
+        <div v-else-if="isTwilio && hasData">
+          <ScannerSummary
+            :badge="twilioBadge"
+            :headline="twilioHeadline"
+            :subtext="twilioSubtext"
+            :groups="twilioGroups"
+            :col-md="4"
+          />
+          <b-alert
+            v-for="(note, index) in twilioNotes"
+            :key="index"
+            show
+            variant="light"
+            class="twilio-note mb-0 mt-2"
+          >
+            {{ note }}
+          </b-alert>
+        </div>
 
         <ScannerSummary
           v-else-if="isOvh && hasData"
@@ -161,7 +180,18 @@ import SearchActionGroups from "./SearchActionGroups.vue";
 import { getScannerDescription } from "@/utils";
 import config from "@/config";
 
-interface NumverifyResult {
+// Capitalises a provider enum like "mobile" or "voip" for display; blank in,
+// blank out.
+const titleCase = (value: string | undefined): string => {
+  if (!value) {
+    return "";
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+// Shared by Numverify and the ValidationScannerResponse providers (Veriphone,
+// NumlookupAPI, Abstract), which all return these field names.
+interface ValidationResult {
   valid: boolean;
   number?: string;
   local_format?: string;
@@ -172,6 +202,21 @@ interface NumverifyResult {
   location?: string;
   carrier?: string;
   line_type?: string;
+}
+
+interface TwilioResult {
+  valid: boolean;
+  national_format?: string;
+  line_type?: string;
+  carrier_name?: string;
+  mobile_country_code?: string;
+  mobile_network_code?: string;
+  caller_name?: string;
+  caller_type?: string;
+  sim_swap_last_date?: string;
+  sim_swap_in_period?: boolean;
+  call_forwarding_status?: string;
+  notes?: string[];
 }
 
 interface NumverifyRow {
@@ -246,8 +291,21 @@ export default class Scanner extends Vue {
   @Prop() scanId!: string;
   @Prop() name!: string;
   @Prop({ default: false }) autoRun!: boolean;
+  // Comparison providers surface their fields in the shared matrix, so their
+  // own panel stays collapsed on success instead of auto-expanding.
+  @Prop({ default: true }) autoExpandOnData!: boolean;
   @Prop({ default: () => ({}) }) scanOptions!: { [key: string]: number };
   @Prop({ default: () => ({}) }) metadata!: LocalMetadata;
+  // When set, the scan result is persisted against this lookup record. Empty (the default)
+  // keeps the original request body and behavior unchanged.
+  @Prop({ default: "" }) lookupId!: string;
+  // Replay mode renders a stored result instead of running the scanner: no dryrun, no run.
+  @Prop({ default: false }) replay!: boolean;
+  @Prop({ default: () => null }) replayResult!: {
+    status: string;
+    raw: unknown;
+    errorMessage?: string;
+  } | null;
 
   get collapseId(): string {
     return `scanner-collapse-${this.scanId}`;
@@ -302,24 +360,34 @@ export default class Scanner extends Vue {
     return this.scanId === "numverify";
   }
 
-  get numverify(): NumverifyResult {
-    return (this.data || {}) as NumverifyResult;
+  get isValidationProvider(): boolean {
+    return ["veriphone", "numlookupapi", "abstract"].includes(this.scanId);
   }
 
-  get numverifyHeadline(): string {
-    return this.numverify.international_format || this.numverify.number || "";
+  // Numverify and the validation providers share one response shape and one
+  // summary rendering.
+  get isValidationLike(): boolean {
+    return this.isNumverify || this.isValidationProvider;
   }
 
-  get numverifyLineType(): string {
-    const lineType = this.numverify.line_type;
-    if (!lineType) {
-      return "";
-    }
-    return lineType.charAt(0).toUpperCase() + lineType.slice(1);
+  get validationResult(): ValidationResult {
+    return (this.data || {}) as ValidationResult;
   }
 
-  get numverifyBadge(): SummaryBadge {
-    return this.numverify.valid
+  get validationHeadline(): string {
+    return (
+      this.validationResult.international_format ||
+      this.validationResult.number ||
+      ""
+    );
+  }
+
+  get validationLineType(): string {
+    return titleCase(this.validationResult.line_type);
+  }
+
+  get validationBadge(): SummaryBadge {
+    return this.validationResult.valid
       ? { variant: "success", label: "Valid number", icon: "check-circle-fill" }
       : {
           variant: "danger",
@@ -328,12 +396,12 @@ export default class Scanner extends Vue {
         };
   }
 
-  get numverifySubtext(): string {
-    return this.numverifyLineType ? `${this.numverifyLineType} line` : "";
+  get validationSubtext(): string {
+    return this.validationLineType ? `${this.validationLineType} line` : "";
   }
 
-  get numverifyGroups(): NumverifyGroup[] {
-    const result = this.numverify;
+  get validationGroups(): NumverifyGroup[] {
+    const result = this.validationResult;
     const definitions: {
       key: string;
       label: string;
@@ -363,7 +431,7 @@ export default class Scanner extends Vue {
         label: "Carrier & line",
         rows: [
           { label: "Carrier", value: result.carrier || "" },
-          { label: "Line type", value: this.numverifyLineType },
+          { label: "Line type", value: this.validationLineType },
         ],
       },
     ];
@@ -374,6 +442,91 @@ export default class Scanner extends Vue {
         rows: group.rows.filter((row) => row.value !== ""),
       }))
       .filter((group) => group.rows.length > 0);
+  }
+
+  get isTwilio(): boolean {
+    return this.scanId === "twilio";
+  }
+
+  get twilio(): TwilioResult {
+    return (this.data || {}) as TwilioResult;
+  }
+
+  get twilioHeadline(): string {
+    return this.twilio.national_format || "";
+  }
+
+  get twilioBadge(): SummaryBadge {
+    return this.twilio.valid
+      ? { variant: "success", label: "Valid number", icon: "check-circle-fill" }
+      : {
+          variant: "danger",
+          label: "Invalid number",
+          icon: "exclamation-circle-fill",
+        };
+  }
+
+  get twilioSubtext(): string {
+    const lineType = titleCase(this.twilio.line_type);
+    return lineType ? `${lineType} line` : "";
+  }
+
+  get twilioGroups(): NumverifyGroup[] {
+    const result = this.twilio;
+    const simSwap =
+      result.sim_swap_in_period === undefined
+        ? ""
+        : result.sim_swap_in_period
+        ? "Yes"
+        : "No";
+    const definitions: {
+      key: string;
+      label: string;
+      rows: NumverifyRow[];
+    }[] = [
+      {
+        key: "carrier",
+        label: "Carrier & line",
+        rows: [
+          { label: "Carrier", value: result.carrier_name || "" },
+          { label: "Line type", value: titleCase(result.line_type) },
+          { label: "National format", value: result.national_format || "" },
+          { label: "MCC", value: result.mobile_country_code || "" },
+          { label: "MNC", value: result.mobile_network_code || "" },
+        ],
+      },
+      {
+        key: "caller",
+        label: "Caller (CNAM)",
+        rows: [
+          { label: "Caller name", value: result.caller_name || "" },
+          { label: "Caller type", value: titleCase(result.caller_type) },
+        ],
+      },
+      {
+        key: "signals",
+        label: "Line signals",
+        rows: [
+          { label: "SIM swapped in period", value: simSwap },
+          { label: "Last SIM swap", value: result.sim_swap_last_date || "" },
+          {
+            label: "Call forwarding",
+            value: titleCase(result.call_forwarding_status),
+          },
+        ],
+      },
+    ];
+
+    return definitions
+      .map((group) => ({
+        ...group,
+        rows: group.rows.filter((row) => row.value !== ""),
+      }))
+      .filter((group) => group.rows.length > 0);
+  }
+
+  get twilioNotes(): string[] {
+    return this.twilio.notes || [];
   }
 
   get isOvh(): boolean {
@@ -503,9 +656,34 @@ export default class Scanner extends Vue {
   }
 
   async mounted(): Promise<void> {
+    // Replay: render the stored result verbatim and skip all network calls (AC7).
+    if (this.replay) {
+      this.applyReplay();
+      return;
+    }
+
     const available = await this.dryRun();
     if (available && this.autoRun) {
       this.runScan();
+    }
+  }
+
+  private applyReplay(): void {
+    if (!this.replayResult) {
+      return;
+    }
+
+    if (this.replayResult.status === "error") {
+      this.error = this.replayResult.errorMessage || "Scanner failed";
+      this.expanded = true;
+      return;
+    }
+
+    this.data = this.replayResult.raw;
+    // Feed the comparison matrix the same way a live result would.
+    this.$emit("result", { scanId: this.scanId, data: this.data });
+    if (this.autoExpandOnData) {
+      this.expanded = true;
     }
   }
 
@@ -549,12 +727,21 @@ export default class Scanner extends Vue {
       this.remainingEtaMs()
     );
     try {
+      const body: {
+        number: string;
+        options: { [key: string]: number };
+        lookupId?: string;
+      } = {
+        number: this.$store.state.number,
+        options: this.scanOptions,
+      };
+      if (this.lookupId) {
+        body.lookupId = this.lookupId;
+      }
+
       const res = await axios.post(
         `${config.apiUrl}/v2/scanners/${this.scanId}/run`,
-        {
-          number: this.$store.state.number,
-          options: this.scanOptions,
-        },
+        body,
         {
           cancelToken: this.cancelSource.token,
           validateStatus: () => true,
@@ -565,7 +752,10 @@ export default class Scanner extends Vue {
         throw res.data.error;
       }
       this.data = res.data.result;
-      this.expanded = true;
+      this.$emit("result", { scanId: this.scanId, data: this.data });
+      if (this.autoExpandOnData) {
+        this.expanded = true;
+      }
       this.emitStatus(
         "complete",
         this.isGoogleSearch
@@ -706,5 +896,10 @@ export default class Scanner extends Vue {
 
 .local-banner {
   border: 1px solid var(--rule-soft);
+}
+
+.twilio-note {
+  border: 1px solid var(--rule-soft);
+  font-size: 0.85rem;
 }
 </style>

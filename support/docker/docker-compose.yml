@@ -6,10 +6,16 @@ services:
     restart: on-failure
     build:
       context: ../..
-      dockerfile: ../../Dockerfile
+      dockerfile: Dockerfile
     command:
       - "serve"
     ports:
       - "80:5000"
     environment:
       - GIN_MODE=release
+      # Lookup persistence database. Kept on the mounted ./data volume so lookups and
+      # their scanner results survive container restarts. It's a single SQLite file
+      # (rollback-journal mode, no -wal/-shm sidecars) — back up by copying ./data.
+      - PHONEINFOGA_DB_PATH=/app/data/phoneinfoga.db
+    volumes:
+      - ./data:/app/data

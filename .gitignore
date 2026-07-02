@@ -29,3 +29,9 @@ phoneinfoga-twilio.zip
 .env
 .env.*
 !.env.example
+
+# Lookup persistence database (runtime data; SQLite + WAL sidecar files)
+*.db
+*.db-wal
+*.db-shm
+support/docker/data/

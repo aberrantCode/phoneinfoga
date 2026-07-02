@@ -27,7 +27,12 @@ func (s *Server) registerRoutes() {
 		POST("/numbers", api.WrapHandler(handlers.AddNumber)).
 		POST("/scanners/:scanner/dryrun", api.WrapHandler(handlers.DryRunScanner)).
 		POST("/scanners/:scanner/run", api.WrapHandler(handlers.RunScanner)).
-		GET("/scanners", api.WrapHandler(handlers.GetAllScanners))
+		GET("/scanners", api.WrapHandler(handlers.GetAllScanners)).
+		POST("/lookups", api.WrapHandler(handlers.CreateLookup)).
+		POST("/lookups/:id/close", api.WrapHandler(handlers.CloseLookup)).
+		GET("/lookups", api.WrapHandler(handlers.ListLookups)).
+		GET("/lookups/latest", api.WrapHandler(handlers.GetLatestLookup)).
+		GET("/lookups/:id", api.WrapHandler(handlers.GetLookup))
 }
 
 func (s *Server) Routes() gin.RoutesInfo {
