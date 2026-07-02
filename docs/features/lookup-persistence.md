@@ -4,7 +4,7 @@
 |---|---|
 | **Feature ID** | `lookup-persistence` |
 | **Category** | Cross-cutting infrastructure (persistence + web UX) |
-| **Status** | Draft — proposed |
+| **Status** | Implemented |
 | **External dependency** | None (embedded SQLite via `modernc.org/sqlite`, pure Go) |
 | **Auth** | None (PhoneInfoga has no auth; see §9 privacy notes) |
 | **Default state** | **Enabled.** Persistence is always on when running `serve`. |
