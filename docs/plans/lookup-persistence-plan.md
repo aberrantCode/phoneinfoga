@@ -213,8 +213,11 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `runNewLookup` clears the replayed results in place (`resetResultsState`, keeps the number)
   and runs `freshLookupFlow` → new `createLookup` + `results/fresh`. Button shown in the replay
   controls next to Start over. Scan.spec: replay → Run new lookup creates a new lookup + fresh.
-- [ ] **7.3** `feat` Add **Previous lookups ▾** dropdown: `listLookups(number)`; selecting an
+- [x] **7.3** `feat` Add **Previous lookups ▾** dropdown: `listLookups(number)`; selecting an
   entry loads `getLookup(id)` and renders in `replay` mode (AC9).
+  `b-dropdown` in the replay controls loads `listLookups(number)` on `@show`; each item's
+  `@click` runs `openPreviousLookup(id)` → `getLookup` → `resetResultsState` + `replayLookup`
+  (no scans). `previousLookupLabel` = time + status. Scan.spec: loads-on-open + open→replay.
 - [ ] **7.4** `feat` Replay banner ("Showing your most recent lookup from &lt;time&gt;").
 - [ ] **7.5** `test` Component tests: entry→replay on 200 (**assert no `/run` calls**),
   entry→fresh on 404, Run new lookup re-scans, dropdown loads detail (AC7–AC9).

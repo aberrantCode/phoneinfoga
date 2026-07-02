@@ -17,6 +17,8 @@ jest.mock("@/utils", () => {
     createLookup: jest.fn(),
     closeLookup: jest.fn(),
     getLatestLookup: jest.fn().mockResolvedValue(null),
+    listLookups: jest.fn().mockResolvedValue([]),
+    getLookup: jest.fn(),
   };
 });
 jest.mock("axios");
@@ -30,6 +32,8 @@ import {
   createLookup,
   closeLookup,
   getLatestLookup,
+  listLookups,
+  getLookup,
   ScannerAvailability,
 } from "@/utils";
 
@@ -37,6 +41,8 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedCreateLookup = createLookup as jest.Mock;
 const mockedCloseLookup = closeLookup as jest.Mock;
 const mockedGetLatestLookup = getLatestLookup as jest.Mock;
+const mockedListLookups = listLookups as jest.Mock;
+const mockedGetLookup = getLookup as jest.Mock;
 
 const mockedGetAvailability = getScannerAvailability as jest.Mock;
 
@@ -574,6 +580,80 @@ describe("Scan.vue", () => {
       expect(mockedCreateLookup).toHaveBeenCalled();
       expect(wrapper.vm.viewState.source).toBe("fresh");
       expect(wrapper.vm.activeLookupId).toBe("lk-new");
+    });
+  });
+
+  describe("previous lookups dropdown (AC9)", () => {
+    const flush = (): Promise<void> =>
+      new Promise((resolve) => setTimeout(resolve, 0));
+
+    beforeEach(() => {
+      mockedListLookups.mockReset();
+      mockedGetLookup.mockReset();
+    });
+
+    it("loads the number's lookups on open", async () => {
+      mockedListLookups.mockResolvedValue([
+        {
+          id: "a",
+          e164: "+14152229670",
+          status: "complete",
+          scannersRequested: ["local"],
+          createdAt: "2026-07-01T09:00:00Z",
+          completedAt: null,
+        },
+      ]);
+
+      const { wrapper } = mountScan();
+      await flush();
+      await wrapper.vm.loadPreviousLookups();
+
+      expect(mockedListLookups).toHaveBeenCalled();
+      expect(wrapper.vm.previousLookups).toHaveLength(1);
+    });
+
+    it("opens a selected lookup and renders it in replay mode without scanning", async () => {
+      mockedGetLookup.mockResolvedValue({
+        id: "a",
+        status: "complete",
+        createdAt: "2026-07-01T09:00:00Z",
+        completedAt: "2026-07-01T09:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [
+          {
+            scanner: "local",
+            status: "success",
+            raw: {},
+            durationMs: 1,
+            startedAt: "",
+            finishedAt: "",
+          },
+        ],
+      });
+      mockedAxios.post.mockReset();
+
+      const { wrapper } = mountScan();
+      await flush();
+      await wrapper.vm.openPreviousLookup("a");
+      await flush();
+
+      expect(mockedGetLookup).toHaveBeenCalledWith("a");
+      expect(wrapper.vm.isReplay).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup.id).toBe("a");
+      // No scanning triggered by opening a historical lookup.
+      expect(mockedAxios.post).not.toHaveBeenCalled();
     });
   });
 

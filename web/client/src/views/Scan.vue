@@ -51,6 +51,25 @@
       >
         Run new lookup
       </b-button>
+      <b-dropdown
+        v-if="isReplay"
+        text="Previous lookups"
+        variant="outline-primary"
+        size="sm"
+        class="mr-2"
+        @show="loadPreviousLookups"
+      >
+        <b-dropdown-item
+          v-for="item in previousLookups"
+          :key="item.id"
+          @click="openPreviousLookup(item.id)"
+        >
+          {{ previousLookupLabel(item) }}
+        </b-dropdown-item>
+        <b-dropdown-text v-if="previousLookups.length === 0">
+          No previous lookups.
+        </b-dropdown-text>
+      </b-dropdown>
       <b-button variant="outline-secondary" size="sm" @click="startOver">
         Start over
       </b-button>
@@ -277,9 +296,12 @@ import {
   createLookup,
   closeLookup,
   getLatestLookup,
+  listLookups,
+  getLookup,
   ScannerAvailability,
   LookupDetail,
   LookupResult,
+  LookupSummary,
   CreateLookupResult,
 } from "../utils";
 import VuePhoneNumberInput from "vue-phone-number-input";
@@ -347,6 +369,7 @@ interface Data {
   scannerResults: { [name: string]: unknown };
   activeLookupId: string;
   lookupClosed: boolean;
+  previousLookups: LookupSummary[];
   localData: {
     valid: boolean;
     raw_local: string;
@@ -415,6 +438,7 @@ export default Vue.extend({
       scannerResults: {},
       activeLookupId: "",
       lookupClosed: false,
+      previousLookups: [],
       localData: {
         valid: false,
         raw_local: "",
@@ -589,6 +613,7 @@ export default Vue.extend({
       this.scannerResults = {};
       this.activeLookupId = "";
       this.lookupClosed = false;
+      this.previousLookups = [];
       this.$store.commit("resetState");
     },
     async loadScannerAvailability(): Promise<void> {
@@ -643,6 +668,30 @@ export default Vue.extend({
         this.$store.commit("pushError", { message: error });
       }
       this.loading = false;
+    },
+    // loadPreviousLookups fetches this number's history for the Previous lookups dropdown (AC9).
+    async loadPreviousLookups(): Promise<void> {
+      try {
+        this.previousLookups = await listLookups(this.$store.state.number);
+      } catch (error) {
+        this.previousLookups = [];
+      }
+    },
+    // openPreviousLookup loads a historical lookup's full detail and renders it in replay
+    // mode (AC9) — no re-scanning.
+    async openPreviousLookup(id: string): Promise<void> {
+      try {
+        const detail = await getLookup(id);
+        this.resetResultsState();
+        this.replayLookup(detail);
+      } catch (error) {
+        this.$store.commit("pushError", { message: error });
+      }
+    },
+    // previousLookupLabel formats a history entry for the dropdown.
+    previousLookupLabel(summary: LookupSummary): string {
+      const time = formatTimestamp(summary.createdAt) || summary.createdAt;
+      return `${time} — ${titleCase(summary.status)}`;
     },
     // resetResultsState clears the rendered results without leaving the results view or
     // clearing the number, so a Run new lookup can re-render in place.
