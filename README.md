@@ -96,12 +96,12 @@ cd support/docker
 docker compose up -d      # creates ./data/phoneinfoga.db, persisted across restarts
 ```
 
-**Backup.** To back up, copy the **entire `./data` directory** while the service is stopped (or
-at least copy the `.db` file **together with its `-wal` and `-shm` sidecar files** — the WAL may
-hold committed data not yet folded into the main file):
+**Backup.** The database is a **single SQLite file** (rollback-journal mode — no `-wal`/`-shm`
+sidecars). Back up by copying the `.db` file (or the whole `./data` directory), ideally while
+the service is stopped so the copy is consistent:
 
 ```bash
-cp -a support/docker/data /path/to/backup/   # or back up $PHONEINFOGA_DB_PATH and its -wal/-shm
+cp -a support/docker/data /path/to/backup/   # or copy $PHONEINFOGA_DB_PATH
 ```
 
 **Privacy / PII.** Records include the **client IP**, **User-Agent** and the **phone numbers**

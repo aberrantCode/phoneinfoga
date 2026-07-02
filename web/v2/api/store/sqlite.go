@@ -52,9 +52,18 @@ func New(path string) (*SQLiteStore, error) {
 	db.SetMaxOpenConns(1)
 
 	pragmas := []string{
-		"PRAGMA journal_mode=WAL",
+		// journal_mode=DELETE (rollback journal) rather than WAL: every commit lands in
+		// the single .db file, with only a transient -journal during a write. This is the
+		// right choice for the mounted-volume Docker workflow (AC4): WAL leaves -wal/-shm
+		// sidecars that, after an unclean container stop, go stale and prevent a fresh
+		// container from reading the committed data. DELETE has no such sidecars, and with
+		// SetMaxOpenConns(1) we don't need WAL's concurrent-reader capability anyway.
+		"PRAGMA journal_mode=DELETE",
 		"PRAGMA busy_timeout=5000",
 		"PRAGMA foreign_keys=ON",
+		// synchronous=FULL fsyncs each commit so a committed lookup is durably on disk
+		// before the call returns (negligible cost for this low write-rate workload).
+		"PRAGMA synchronous=FULL",
 	}
 	for _, p := range pragmas {
 		if _, err := db.Exec(p); err != nil {

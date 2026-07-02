@@ -97,6 +97,23 @@ func TestApplyMigrationRollsBackOnError(t *testing.T) {
 	assert.Equal(t, 1, version, "failed migration must not advance user_version")
 }
 
+func TestConnectionPragmas(t *testing.T) {
+	s := newTestStore(t)
+
+	var journal string
+	require.NoError(t, s.db.QueryRow("PRAGMA journal_mode").Scan(&journal))
+	assert.Equal(t, "delete", journal)
+
+	var fk int
+	require.NoError(t, s.db.QueryRow("PRAGMA foreign_keys").Scan(&fk))
+	assert.Equal(t, 1, fk)
+
+	// synchronous FULL == 2: durability for the mounted-volume Docker workflow (AC4).
+	var sync int
+	require.NoError(t, s.db.QueryRow("PRAGMA synchronous").Scan(&sync))
+	assert.Equal(t, 2, sync)
+}
+
 func TestMigrateSetsUserVersion(t *testing.T) {
 	s := newTestStore(t)
 	var version int

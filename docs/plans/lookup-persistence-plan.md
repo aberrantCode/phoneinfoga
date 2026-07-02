@@ -262,8 +262,16 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   `setupStore`). (`-race` skipped locally: no gcc on this Windows box; CI runs it on Linux.)
 - [x] **9.2** `test` Frontend suite green: `yarn lint && yarn test:unit && yarn build`.
   `yarn lint` clean, `yarn test:unit` 87/87 across 8 suites, `yarn build` produces dist. All green.
-- [ ] **9.3** `test` Manual E2E in Docker: fresh lookup → restart container → replay from
+- [x] **9.3** `test` Manual E2E in Docker: fresh lookup → restart container → replay from
   disk (AC4); verify AC1–AC13 checklist in the spec.
+  Ran the real `docker compose down/up` (bind-mounted `./data`) against the built image via the
+  REST API with the `local` scanner: AC1 pending record, AC2 result persisted (200), AC3 close→
+  complete, **AC4 replay from disk after down/up ✅**, AC9 list, AC10 other-number→404, AC13
+  `/run` without lookupId→200 (unchanged). **Fixed an AC4 durability defect the E2E surfaced:**
+  WAL's `-wal`/`-shm` sidecars go stale after an unclean container stop and hide committed data
+  from a fresh container — switched the store to `journal_mode=DELETE` + `synchronous=FULL`
+  (single durable `.db` file; `SetMaxOpenConns(1)` means WAL's concurrency is unneeded). Updated
+  spec §5/§9, README, `.env.example`, docker-compose comment (backup = copy the single `.db`).
 - [ ] **9.4** `chore` Self-review for CRITICAL/HIGH issues (security-reviewer on IP/PII
   handling + SQL); ensure parameterized queries only.
 - [ ] **9.5** `docs` Flip spec **Status** to `Implemented`; open a PR to `dev` with Summary
