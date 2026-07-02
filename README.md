@@ -119,6 +119,13 @@ support/scripts/purge-lookups.sh 7
 
 Schedule it (e.g. via cron) if you want automatic pruning.
 
+**Exposure.** PhoneInfoga has no authentication by design, and with persistence enabled the
+lookup endpoints are the first that write to disk on every request. **Do not expose a
+persistence-enabled `serve` instance directly to an untrusted network.** Run it on localhost or
+behind an authenticating reverse proxy / VPN, and schedule `purge-lookups.sh` so the database
+(and mounted volume) can't grow without bound. This matches PhoneInfoga's single-user,
+self-hosted model.
+
 ## Anti-features
 
 - Does not claim to provide relevant or verified data — it's just a tool!

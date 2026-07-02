@@ -20,6 +20,10 @@ var ErrLookupNotFound = errors.New("store: lookup not found")
 // defaultListLimit caps ListLookupsByNumber when the caller passes a non-positive limit.
 const defaultListLimit = 20
 
+// maxListLimit is the hard upper bound on ListLookupsByNumber, so an unauthenticated
+// caller can't request an arbitrarily large history page (result-set amplification).
+const maxListLimit = 100
+
 // SQLiteStore is the embedded-SQLite implementation of Store. It satisfies the Store
 // interface and additionally exposes Close for lifecycle management by the serve command.
 type SQLiteStore struct {
@@ -296,6 +300,9 @@ func (s *SQLiteStore) GetLatestLookupByNumber(ctx context.Context, e164 string) 
 func (s *SQLiteStore) ListLookupsByNumber(ctx context.Context, e164 string, limit int) ([]Lookup, error) {
 	if limit <= 0 {
 		limit = defaultListLimit
+	}
+	if limit > maxListLimit {
+		limit = maxListLimit
 	}
 
 	rows, err := s.db.QueryContext(ctx,

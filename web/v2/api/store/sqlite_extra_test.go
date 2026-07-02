@@ -97,6 +97,21 @@ func TestApplyMigrationRollsBackOnError(t *testing.T) {
 	assert.Equal(t, 1, version, "failed migration must not advance user_version")
 }
 
+func TestListLookupsByNumberCapsLimit(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// Seed more than the hard cap so an oversized request is demonstrably clamped.
+	for i := 0; i < maxListLimit+5; i++ {
+		_, err := s.CreateLookup(ctx, sampleLookup(numberA, "local"))
+		require.NoError(t, err)
+	}
+
+	list, err := s.ListLookupsByNumber(ctx, numberA, 100000)
+	require.NoError(t, err)
+	assert.Len(t, list, maxListLimit, "an oversized limit must be capped at maxListLimit")
+}
+
 func TestConnectionPragmas(t *testing.T) {
 	s := newTestStore(t)
 

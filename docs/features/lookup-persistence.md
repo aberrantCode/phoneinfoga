@@ -232,6 +232,14 @@ lookup time, client IP, scanners requested, overall status.
   raw and retained indefinitely by design. A purge script
   `support/scripts/purge-lookups.sh` deletes records older than N days and `VACUUM`s.
   This is documented in the README's self-hosting section.
+- **Exposure / DoS (accepted risk)** — these are the first unauthenticated endpoints that
+  write to disk per request, so a persistence-enabled `serve` open to an untrusted network is
+  a storage-exhaustion DoS surface. Mitigations: history reads are hard-capped
+  (`maxListLimit=100`); the store is single-writer; and the README instructs operators to keep
+  a persistence-enabled instance on localhost / behind an authenticating proxy and to schedule
+  the purge script. A per-endpoint rate limiter is intentionally **not** added — it is out of
+  scope for PhoneInfoga's no-auth, single-user design; the residual risk is consciously accepted
+  and documented.
 
 ## 10. Acceptance criteria
 
