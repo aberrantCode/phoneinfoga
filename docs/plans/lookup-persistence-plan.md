@@ -209,7 +209,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
   → `freshLookupFlow`. `Scanner` gained `replay`/`replayResult` props — in replay it seeds `data`
   from the stored payload and returns early from `mounted()` (no dryrun/run), emitting `result`
   for the matrix. Scan.spec: 200 replays with no createLookup/axios.post, 404 runs fresh.
-- [ ] **7.2** `feat` Add **Run new lookup** (forces fresh scan of the same number, AC8).
+- [x] **7.2** `feat` Add **Run new lookup** (forces fresh scan of the same number, AC8).
+  `runNewLookup` clears the replayed results in place (`resetResultsState`, keeps the number)
+  and runs `freshLookupFlow` → new `createLookup` + `results/fresh`. Button shown in the replay
+  controls next to Start over. Scan.spec: replay → Run new lookup creates a new lookup + fresh.
 - [ ] **7.3** `feat` Add **Previous lookups ▾** dropdown: `listLookups(number)`; selecting an
   entry loads `getLookup(id)` and renders in `replay` mode (AC9).
 - [ ] **7.4** `feat` Replay banner ("Showing your most recent lookup from &lt;time&gt;").

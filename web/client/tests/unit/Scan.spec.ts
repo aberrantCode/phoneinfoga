@@ -521,6 +521,60 @@ describe("Scan.vue", () => {
       expect(mockedCreateLookup).toHaveBeenCalled();
       expect(wrapper.vm.viewState.source).toBe("fresh");
     });
+
+    it("Run new lookup forces a fresh scan from replay (AC8)", async () => {
+      mockedGetLatestLookup.mockResolvedValue({
+        id: "lk-old",
+        status: "complete",
+        createdAt: "2026-07-01T09:00:00Z",
+        completedAt: "2026-07-01T09:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [
+          {
+            scanner: "local",
+            status: "success",
+            raw: {},
+            durationMs: 1,
+            startedAt: "",
+            finishedAt: "",
+          },
+        ],
+      });
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-new",
+        createdAt: "",
+        clientIp: "",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+      expect(wrapper.vm.isReplay).toBe(true);
+
+      await wrapper.vm.runNewLookup();
+      await flush();
+
+      // A brand-new lookup was created and we are now in the fresh results state.
+      expect(mockedCreateLookup).toHaveBeenCalled();
+      expect(wrapper.vm.viewState.source).toBe("fresh");
+      expect(wrapper.vm.activeLookupId).toBe("lk-new");
+    });
   });
 
   describe("request record in metadata panel (AC5)", () => {

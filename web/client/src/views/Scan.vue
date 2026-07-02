@@ -41,6 +41,16 @@
       v-if="isResultsState"
       class="results-controls d-flex justify-content-center mt-5"
     >
+      <b-button
+        v-if="isReplay"
+        variant="dark"
+        size="sm"
+        class="mr-2"
+        :disabled="loading"
+        @click="runNewLookup"
+      >
+        Run new lookup
+      </b-button>
       <b-button variant="outline-secondary" size="sm" @click="startOver">
         Start over
       </b-button>
@@ -621,6 +631,29 @@ export default Vue.extend({
       }
 
       this.loading = false;
+    },
+    // runNewLookup forces a fresh scan of the current number, bypassing the replay check
+    // (AC8). Called from the replay controls; keeps the number, discards replayed results.
+    async runNewLookup(): Promise<void> {
+      this.resetResultsState();
+      this.loading = true;
+      try {
+        await this.freshLookupFlow();
+      } catch (error) {
+        this.$store.commit("pushError", { message: error });
+      }
+      this.loading = false;
+    },
+    // resetResultsState clears the rendered results without leaving the results view or
+    // clearing the number, so a Run new lookup can re-render in place.
+    resetResultsState(): void {
+      this.isLookup = false;
+      this.showInformations = false;
+      this.scanners = [];
+      this.scannerStatuses = [];
+      this.scannerResults = {};
+      this.activeLookupId = "";
+      this.lookupClosed = false;
     },
     // freshLookupFlow fetches number metadata and, when valid, runs a fresh lookup.
     async freshLookupFlow(): Promise<void> {
