@@ -232,8 +232,10 @@ Legend: `[ ]` todo · `[x]` done. Type tags: `feat` `test` `chore` `docs`.
 
 ## Phase 8 — Docker, purge script, docs
 
-- [ ] **8.1** `chore` `support/docker/docker-compose.yml`: add
+- [x] **8.1** `chore` `support/docker/docker-compose.yml`: add
   `PHONEINFOGA_DB_PATH=/app/data/phoneinfoga.db` env + `./data:/app/data` volume.
+  Added the env + `./data:/app/data` bind mount; `docker compose config` validates. Also
+  gitignored `*.db`/`-wal`/`-shm` and `support/docker/data/` so runtime DB files aren't committed.
 - [ ] **8.2** `chore` `.env.example`: document `PHONEINFOGA_DB_PATH`.
 - [ ] **8.3** `feat` `support/scripts/purge-lookups.sh`: delete records older than N days
   (arg/env) and `VACUUM`. Idempotent.
