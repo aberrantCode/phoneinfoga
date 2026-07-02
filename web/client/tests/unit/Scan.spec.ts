@@ -16,6 +16,7 @@ jest.mock("@/utils", () => {
     getScannerAvailability: jest.fn().mockResolvedValue([]),
     createLookup: jest.fn(),
     closeLookup: jest.fn(),
+    getLatestLookup: jest.fn().mockResolvedValue(null),
   };
 });
 jest.mock("axios");
@@ -28,12 +29,14 @@ import {
   getScannerDescription,
   createLookup,
   closeLookup,
+  getLatestLookup,
   ScannerAvailability,
 } from "@/utils";
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedCreateLookup = createLookup as jest.Mock;
 const mockedCloseLookup = closeLookup as jest.Mock;
+const mockedGetLatestLookup = getLatestLookup as jest.Mock;
 
 const mockedGetAvailability = getScannerAvailability as jest.Mock;
 
@@ -370,6 +373,9 @@ describe("Scan.vue", () => {
       mockedCreateLookup.mockReset();
       mockedCloseLookup.mockReset();
       mockedAxios.post.mockReset();
+      // Default: no prior lookup, so runScans takes the fresh path.
+      mockedGetLatestLookup.mockReset();
+      mockedGetLatestLookup.mockResolvedValue(null);
     });
 
     // Drain the mounted() availability loader first so it can't overwrite the
@@ -449,6 +455,71 @@ describe("Scan.vue", () => {
 
       expect(wrapper.vm.isResultsState).toBe(true);
       expect(wrapper.vm.activeLookupId).toBe("");
+    });
+
+    it("replays the latest lookup without scanning on 200 (AC7)", async () => {
+      mockedGetLatestLookup.mockResolvedValue({
+        id: "lk-old",
+        status: "complete",
+        createdAt: "2026-07-01T09:00:00Z",
+        completedAt: "2026-07-01T09:01:00Z",
+        clientIp: "203.0.113.7",
+        userAgent: "UA",
+        scannersRequested: ["local"],
+        number: {
+          valid: true,
+          e164: "+14152229670",
+          rawLocal: "4152229670",
+          local: "",
+          international: "",
+          countryCode: 1,
+          country: "US",
+          carrier: "",
+        },
+        results: [
+          {
+            scanner: "local",
+            status: "success",
+            raw: { e164: "+14152229670" },
+            durationMs: 1,
+            startedAt: "2026-07-01T09:00:00Z",
+            finishedAt: "2026-07-01T09:00:00Z",
+          },
+        ],
+      });
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(mockedGetLatestLookup).toHaveBeenCalled();
+      // Replay: no fresh persistence and no /run or /v2/numbers requests (AC7).
+      expect(mockedCreateLookup).not.toHaveBeenCalled();
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(wrapper.vm.isReplay).toBe(true);
+      expect(wrapper.vm.viewState.activeLookup.id).toBe("lk-old");
+      expect(wrapper.vm.localData.e164).toBe("+14152229670");
+    });
+
+    it("runs a fresh lookup when there is no prior lookup (404)", async () => {
+      mockedGetLatestLookup.mockResolvedValue(null);
+      mockedCreateLookup.mockResolvedValue({
+        id: "lk-new",
+        createdAt: "",
+        clientIp: "",
+        scannersRequested: ["local"],
+        status: "pending",
+      });
+      mockedAxios.post.mockResolvedValue({ data: validNumber } as never);
+
+      const { wrapper } = mountScan();
+      await arrangeFreshLookup(wrapper);
+      await wrapper.vm.runScans();
+      await flush();
+
+      expect(mockedCreateLookup).toHaveBeenCalled();
+      expect(wrapper.vm.viewState.source).toBe("fresh");
     });
   });
 

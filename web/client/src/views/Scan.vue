@@ -237,11 +237,13 @@
             :key="index"
             :name="getScannerDisplayName(scanner.name)"
             :scanId="scanner.name"
-            :autoRun="true"
+            :autoRun="!isReplay"
             :auto-expand-on-data="!isComparisonProvider(scanner.name)"
             :scan-options="getScannerRunOptions(scanner.name)"
             :metadata="localData"
             :lookup-id="activeLookupId"
+            :replay="isReplay"
+            :replay-result="replayResultFor(scanner.name)"
             @status="updateScannerStatus"
             @result="captureScannerResult"
           />
@@ -264,8 +266,10 @@ import {
   getScannerRunOptions,
   createLookup,
   closeLookup,
+  getLatestLookup,
   ScannerAvailability,
   LookupDetail,
+  LookupResult,
   CreateLookupResult,
 } from "../utils";
 import VuePhoneNumberInput from "vue-phone-number-input";
@@ -593,6 +597,8 @@ export default Vue.extend({
       }
       this.scannerLoading = false;
     },
+    // runScans is the Lookup click handler. It first checks for a prior lookup of this
+    // number: a hit is replayed from storage (no scans, AC7); a miss runs a fresh lookup.
     async runScans(): Promise<void> {
       this.clearData();
       if (!isValid(this.inputNumber)) {
@@ -601,26 +607,74 @@ export default Vue.extend({
       }
 
       this.loading = true;
-
       this.$store.commit("setNumber", formatNumber(this.inputNumber));
 
       try {
-        const res = await axios.post(`${config.apiUrl}/v2/numbers`, {
-          number: this.$store.state.number,
-        });
-
-        this.localData = res.data;
-
-        if (this.localData.valid) {
-          await this.startFreshLookup();
+        const latest = await getLatestLookup(this.$store.state.number);
+        if (latest) {
+          this.replayLookup(latest);
         } else {
-          this.showInformations = true;
+          await this.freshLookupFlow();
         }
       } catch (error) {
         this.$store.commit("pushError", { message: error });
       }
 
       this.loading = false;
+    },
+    // freshLookupFlow fetches number metadata and, when valid, runs a fresh lookup.
+    async freshLookupFlow(): Promise<void> {
+      const res = await axios.post(`${config.apiUrl}/v2/numbers`, {
+        number: this.$store.state.number,
+      });
+      this.localData = res.data;
+
+      if (this.localData.valid) {
+        await this.startFreshLookup();
+      } else {
+        this.showInformations = true;
+      }
+    },
+    // replayLookup renders a stored lookup without running any scanner (AC7). The stored
+    // per-scanner raw payloads are byte-identical to live results, so the same display
+    // components render them; each Scanner is mounted in replay mode.
+    replayLookup(detail: LookupDetail): void {
+      this.localData = {
+        valid: detail.number.valid,
+        raw_local: detail.number.rawLocal,
+        local: detail.number.local,
+        e164: detail.number.e164,
+        international: detail.number.international,
+        countryCode: detail.number.countryCode,
+        country: detail.number.country,
+        carrier: detail.number.carrier,
+      };
+
+      this.scanners = detail.results.map((result) => ({
+        name: result.scanner,
+        description: "",
+        available: true,
+      }));
+      this.scannerStatuses = detail.results.map((result) => ({
+        scanId: result.scanner,
+        scanner: getScannerDisplayName(result.scanner),
+        status: result.status === "error" ? "error" : "complete",
+        message:
+          result.status === "error"
+            ? result.errorMessage || "Scanner failed"
+            : "Loaded from history",
+      }));
+
+      this.enterResults("replay", detail);
+      this.isLookup = true;
+    },
+    // replayResultFor returns the stored result for a scanner when rendering a replay.
+    replayResultFor(name: string): LookupResult | null {
+      const lookup = this.viewState.activeLookup;
+      if (!lookup || !("results" in lookup)) {
+        return null;
+      }
+      return lookup.results.find((result) => result.scanner === name) || null;
     },
     // startFreshLookup records the request (createLookup) BEFORE the scanners mount,
     // so each per-scanner /run carries the lookupId and its result is persisted (AC1/AC2).

@@ -299,6 +299,13 @@ export default class Scanner extends Vue {
   // When set, the scan result is persisted against this lookup record. Empty (the default)
   // keeps the original request body and behavior unchanged.
   @Prop({ default: "" }) lookupId!: string;
+  // Replay mode renders a stored result instead of running the scanner: no dryrun, no run.
+  @Prop({ default: false }) replay!: boolean;
+  @Prop({ default: () => null }) replayResult!: {
+    status: string;
+    raw: unknown;
+    errorMessage?: string;
+  } | null;
 
   get collapseId(): string {
     return `scanner-collapse-${this.scanId}`;
@@ -649,9 +656,34 @@ export default class Scanner extends Vue {
   }
 
   async mounted(): Promise<void> {
+    // Replay: render the stored result verbatim and skip all network calls (AC7).
+    if (this.replay) {
+      this.applyReplay();
+      return;
+    }
+
     const available = await this.dryRun();
     if (available && this.autoRun) {
       this.runScan();
+    }
+  }
+
+  private applyReplay(): void {
+    if (!this.replayResult) {
+      return;
+    }
+
+    if (this.replayResult.status === "error") {
+      this.error = this.replayResult.errorMessage || "Scanner failed";
+      this.expanded = true;
+      return;
+    }
+
+    this.data = this.replayResult.raw;
+    // Feed the comparison matrix the same way a live result would.
+    this.$emit("result", { scanId: this.scanId, data: this.data });
+    if (this.autoExpandOnData) {
+      this.expanded = true;
     }
   }
 
